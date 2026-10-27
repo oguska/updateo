@@ -79,6 +79,15 @@ Notlar:
 - [x] systemd timer ile arka plan bildirimi — `updateo install-timer` + `check --notify`
 - [x] Geçmişin JSONL yerine SQLite'a taşınması (`history.db`, otomatik içe aktarma)
 - [x] İngilizce arayüz — sistem diline göre otomatik (TR/EN)
+- [ ] Paket kurma: `i` → isim girişi (tui-input) → `pacman -S` / `yay -S` /
+      `flatpak install` mevcut askıya-alma akışıyla
+- [ ] Paket kaldırma: `X` → onay dialoğu (tui-popup) + ters-bağımlılık özeti +
+      `base`/`base-devel` koruması → `pacman -Rns` / `flatpak uninstall`
+- [ ] Paket arama ve `/` canlı filtre: `pacman -Ss` / `yay -Ss` çıktıları,
+      detay paneli (`pacman -Qi/-Si`, `flatpak info`)
+- [ ] Görsel yenileme: tui-scrollbar ile akıcı kaydırma, kontrol sırasında
+      animasyonlu spinner + eta, popup'lı onay akışı, big-text başlık
+      (hepsi ratatui 0.30.2 ile uyumu test edildi)
 
 ## Lisans
 
