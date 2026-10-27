@@ -14,6 +14,7 @@ use std::process::Command;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
 use std::time::{Duration, Instant};
+use tui_input::{Input, backend::crossterm::EventHandler};
 
 /// Sekme sayısı: üç kaynak + geçmiş (sonuncusu).
 const TAB_COUNT: usize = Source::ALL.len() + 1;
@@ -32,6 +33,8 @@ pub struct App {
     checking: usize,      // bekleyen kontrol sayısı
     status: String,
     status_err: bool,
+    /// Aktif kurma girdisi (`i` tuşuyla açılır); None = normal gezinme modu.
+    pkg_input: Option<Input>,
     pub quit: bool,
     rx: Receiver<CheckMsg>,
     tx: Sender<CheckMsg>,
@@ -50,6 +53,7 @@ impl App {
             checking: 0,
             status: tr("Checking for updates…", "Güncellemeler kontrol ediliyor…"),
             status_err: false,
+            pkg_input: None,
             quit: false,
             rx,
             tx,
@@ -344,9 +348,76 @@ impl App {
         self.spawn_checks();
     }
 
+    /// Tek paket kurma: TUI askıya alınır, kurucu gerçek TTY'yi kullanır
+    /// (parola/onaylar dahil). Sonuç geçmişe yazılır, sonra yeniden kontrol.
+    fn install(&mut self, name: String) {
+        if self.is_hist_tab() {
+            return;
+        }
+        let src = Source::ALL[self.tab];
+        let mut cmd = sources::install_command(src, &name);
+        self.status = tr(
+            &format!("Installing {name} via {}…", src.label()),
+            &format!("{name}, {} ile kuruluyor…", src.label()),
+        );
+        self.status_err = false;
+        let outcome = match runner::run_suspended(&mut cmd) {
+            Ok(st) if st.success() => {
+                self.status = tr(&format!("{name} installed."), &format!("{name} kuruldu."));
+                format!("install ok ({name})")
+            }
+            Ok(st) => {
+                self.status = tr(
+                    &format!("Install of {name} did not finish ({st})"),
+                    &format!("{name} kurulumu tamamlanmadı ({st})"),
+                );
+                self.status_err = true;
+                format!("install failed ({name}, {st})")
+            }
+            Err(e) => {
+                self.status = tr(
+                    &format!("Cannot start install of {name}: {e}"),
+                    &format!("{name} kurulumu başlatılamadı: {e}"),
+                );
+                self.status_err = true;
+                format!("install could not start ({name}, {e})")
+            }
+        };
+        history::record(src.label(), &outcome, &[name]);
+        self.history = history::load();
+        self.spawn_checks();
+    }
+
     fn on_key(&mut self, k: KeyEvent) -> std::io::Result<()> {
         if k.modifiers == KeyModifiers::CONTROL && k.code == KeyCode::Char('c') {
             self.quit = true;
+            return Ok(());
+        }
+        // Kurma girdisi açıksa tuşlar önce ona gider; Enter başlatır, Esc kapatır.
+        if let Some(mut inp) = self.pkg_input.take() {
+            match k.code {
+                KeyCode::Enter => {
+                    let name = inp.value().trim().to_string();
+                    if name.is_empty() {
+                        self.status = tr(
+                            "Empty name — press Esc to cancel.",
+                            "İsim boş — Esc ile vazgeç.",
+                        );
+                        self.status_err = false;
+                        self.pkg_input = Some(inp);
+                    } else {
+                        self.install(name);
+                    }
+                }
+                KeyCode::Esc => {
+                    self.status = tr("Install cancelled.", "Kurulum iptal edildi.");
+                    self.status_err = false;
+                }
+                _ => {
+                    inp.handle_event(&Event::Key(k));
+                    self.pkg_input = Some(inp);
+                }
+            }
             return Ok(());
         }
         match k.code {
@@ -362,6 +433,14 @@ impl App {
             KeyCode::Char('r') => self.start_refresh(),
             KeyCode::Char('R') => self.sync_db(),
             KeyCode::Char('u') | KeyCode::Enter => self.apply(),
+            KeyCode::Char('i') if !self.is_hist_tab() => {
+                self.pkg_input = Some(Input::new(String::new()));
+                self.status = tr(
+                    "Type package name — Enter installs via current tab's manager, Esc cancels.",
+                    "Paket adı yaz — Enter içinde bulunulan sekmenin kurucusunu çalıştırır, Esc vazgeçer.",
+                );
+                self.status_err = false;
+            }
             KeyCode::Char('1') => self.switch_tab(0),
             KeyCode::Char('2') => self.switch_tab(1),
             KeyCode::Char('3') => self.switch_tab(2),
@@ -487,8 +566,8 @@ impl App {
         }
         spans.push(Span::styled(
             tr(
-                "   j/k move · space select · a all · r refresh · R refresh db · u apply · q quit",
-                "   j/k hareket · space seçim · a tümünü · r yenile · R db tazele · u güncelle · q çık",
+                "   j/k move · space select · a all · r refresh · R refresh db · i install · u apply · q quit",
+                "   j/k hareket · space seçim · a tümünü · r yenile · R db tazele · i kur · u güncelle · q çık",
             ),
             Style::new().fg(Color::DarkGray),
         ));
@@ -583,7 +662,63 @@ impl App {
             f.render_widget(Paragraph::new(lines).block(block), list_area);
         }
 
-        // Durum satırı
+        // Durum satırı — kurma girdisi aktifse o satır giriş satırına dönüşür
+        if let Some(inp) = &self.pkg_input {
+            let src = Source::ALL[self.tab];
+            let prefix = match src {
+                Source::Pacman => format!(
+                    " {} pacman -S ",
+                    std::env::var("UPDATEO_SUDO")
+                        .unwrap_or_else(|_| "sudo".into())
+                        .trim()
+                ),
+                Source::Aur => " yay -S ".to_string(),
+                Source::Flatpak => " flatpak install ".to_string(),
+            };
+            let hint = tr("Enter install · Esc cancel", "Enter kur · Esc vazgeç");
+            let label = tr(" install ", " kurma ");
+            let avail = (status_area.width as usize)
+                .saturating_sub(
+                    prefix.chars().count() + hint.chars().count() + label.chars().count() + 4,
+                )
+                .max(1);
+            let chars: Vec<char> = inp.value().chars().collect();
+            let start = inp.visual_scroll(avail);
+            let cur = inp.cursor();
+            let mut spans = vec![
+                Span::styled(
+                    label,
+                    Style::new()
+                        .fg(Color::Black)
+                        .bg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(
+                    prefix,
+                    Style::new().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+                ),
+            ];
+            for (i, c) in chars.iter().enumerate().skip(start).take(avail) {
+                let st = if i == cur {
+                    Style::new().bg(Color::White).fg(Color::Black)
+                } else {
+                    Style::new().fg(Color::White)
+                };
+                spans.push(Span::styled(c.to_string(), st));
+            }
+            if cur >= start && cur < start + avail && cur >= chars.len() {
+                spans.push(Span::styled(
+                    " ",
+                    Style::new().bg(Color::White).fg(Color::Black),
+                ));
+            }
+            spans.push(Span::styled(
+                format!("   {hint}"),
+                Style::new().fg(Color::DarkGray),
+            ));
+            f.render_widget(Paragraph::new(Line::from(spans)), status_area);
+            return;
+        }
         let style = if self.status_err {
             Style::new().fg(Color::Red)
         } else if self.checking > 0 {

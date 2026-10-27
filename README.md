@@ -16,6 +16,9 @@ listeler, paket paket seçmene olanak tanır ve güncellemeleri doğrudan uygula
 - `u` ile uygulama: TUI geçici olarak askıya alınır; `sudo pacman -Syu`,
   `yay -S` ve `flatpak update` gerçek TTY'de, tüm etkileşimli onaylarıyla
   (parola sorusu, pacman çatışma onayları, yay derleme akışı) çalışır
+- Tek paket kurma: `i` alt barda isim girişi açar; Enter mevcut sekmenin
+  kurucusunu (sudo pacman -S / yay -S / flatpak install) gerçek TTY'de
+  çalıştırır, sonuç geçmişe yazılır
 - Kontroller paralel thread'lerde; ağ hatası tek kaynağı düşürür, arayüzü kilitlemez
 - Tek statik binary, runtime bağımlılığı yok (SQLite gömülü)
 - Arayüz dili sistem dilinden seçilir: `LC_ALL` → `LC_MESSAGES` → `LANG`;
@@ -41,6 +44,8 @@ space           seçim            a                sekmede tümünü seç
 1 / 2 / 3 / 4   sekmeler (4 = geçmiş)   Tab / Ok tuşları  sekme değiştir
 r               yeniden kontrol  R                db tazele (sudo pacman -Sy)
 u / Enter       seçili paketleri güncelle        q / Esc  çık
+i               tek paket kur (sudo pacman -S / yay -S / flatpak install;
+                Enter başlatır, Esc vazgeçer)
 ```
 
 ## Derleme
@@ -79,8 +84,8 @@ Notlar:
 - [x] systemd timer ile arka plan bildirimi — `updateo install-timer` + `check --notify`
 - [x] Geçmişin JSONL yerine SQLite'a taşınması (`history.db`, otomatik içe aktarma)
 - [x] İngilizce arayüz — sistem diline göre otomatik (TR/EN)
-- [ ] Paket kurma: `i` → isim girişi (tui-input) → `pacman -S` / `yay -S` /
-      `flatpak install` mevcut askıya-alma akışıyla
+- [x] Paket kurma: `i` → isim girişi (tui-input) → `pacman -S` / `yay -S` /
+      `flatpak install` mevcut askıya-alma akışıyla; sonuç geçmişe yazılır
 - [ ] Paket kaldırma: `X` → onay dialoğu (tui-popup) + ters-bağımlılık özeti +
       `base`/`base-devel` koruması → `pacman -Rns` / `flatpak uninstall`
 - [ ] Paket arama ve `/` canlı filtre: `pacman -Ss` / `yay -Ss` çıktıları,

@@ -57,16 +57,34 @@ pub type CheckResult = Result<Vec<Update>, String>;
 /// `UPDATEO_SUDO="doas"` gibi bir değerle değiştirilebilir (boşlukla ayrılan
 /// ilk parça program, kalanı önek argüman olur — ör. `UPDATEO_SUDO="doas -n"`).
 pub fn root_command(program: &str, args: &[&str]) -> Command {
-    let wrapper: Vec<String> = std::env::var("UPDATEO_SUDO")
+    let wrapper = std::env::var("UPDATEO_SUDO")
         .unwrap_or_else(|_| "sudo".into())
-        .split_whitespace()
-        .map(String::from)
-        .collect();
-    let mut c = Command::new(wrapper.first().map(String::as_str).unwrap_or("sudo"));
-    c.args(&wrapper[1..]);
+        .trim()
+        .to_string();
+    with_wrapper(&wrapper, program, args)
+}
+
+/// `UPDATEO_SUDO` sözdizimini (ilk parça program, kalanı önek argüman)
+/// uygulayan saf çekirdek; env değişkeni okumaz, test edilebilir.
+fn with_wrapper(wrapper: &str, program: &str, args: &[&str]) -> Command {
+    let parts: Vec<&str> = wrapper.split_whitespace().collect();
+    let mut c = Command::new(parts.first().copied().unwrap_or("sudo"));
+    if let Some(rest) = parts.get(1..) {
+        c.args(rest);
+    }
     c.arg(program);
     c.args(args);
     c
+}
+
+/// Tek paket kurma komutu: pacman kök sarmalayıcıdan geçer; yay ve flatpak
+/// yetkiyi kendi yönetir, gerçek TTY'de etkileşimli çalışır.
+pub fn install_command(src: Source, name: &str) -> Command {
+    match src {
+        Source::Pacman => root_command("pacman", &["-S", name]),
+        Source::Aur => cmd("yay", &["-S", name]),
+        Source::Flatpak => cmd("flatpak", &["install", name]),
+    }
 }
 
 /// Komutu çalıştır, stdout döndür; başarısızlıkta stderr'i hata mesajı yap.
@@ -210,6 +228,33 @@ pub fn sort_updates(v: &mut [Update]) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn kurma_komutlari() {
+        let c = install_command(Source::Aur, "hello");
+        assert_eq!(c.get_program(), "yay");
+        assert_eq!(c.get_args().collect::<Vec<_>>(), ["-S", "hello"]);
+
+        let c = install_command(Source::Flatpak, "com.microsoft.Edge");
+        assert_eq!(c.get_program(), "flatpak");
+        assert_eq!(
+            c.get_args().collect::<Vec<_>>(),
+            ["install", "com.microsoft.Edge"]
+        );
+
+        // sarmalayıcı sözdizimi: doas + önek argüman pacman'e iletilir
+        let c = with_wrapper("doas -n", "pacman", &["-S", "hello"]);
+        assert_eq!(c.get_program(), "doas");
+        assert_eq!(
+            c.get_args().collect::<Vec<_>>(),
+            ["-n", "pacman", "-S", "hello"]
+        );
+
+        // boş sarmalayıcı varsayılana düşer
+        let c = with_wrapper("", "pacman", &["-Sy"]);
+        assert_eq!(c.get_program(), "sudo");
+        assert_eq!(c.get_args().collect::<Vec<_>>(), ["pacman", "-Sy"]);
+    }
 
     #[test]
     fn arrow_lines() {
