@@ -183,6 +183,22 @@ if ! grep -q '"notify": false' "$cfg/updateo/config.json" ||
     fail=$((fail + 1))
 fi
 
+# 19) systemd birimleri XDG config kökündeki systemd/user altına yazılır
+printf '%-46s ' "install-timer writes systemd units"
+timer_cfg=.e2e/xdgT
+rm -rf "$timer_cfg"
+if env XDG_CONFIG_HOME="$timer_cfg" PATH="$PWD/.e2e/tools:$PATH" \
+    target/release/updateo install-timer >.e2e/logs/probe.out 2>&1 &&
+    [ -f "$timer_cfg/systemd/user/updateo.timer" ] &&
+    [ -f "$timer_cfg/systemd/user/updateo.service" ] &&
+    [ ! -e "$timer_cfg/updateo/systemd/user/updateo.timer" ]; then
+    echo OK
+else
+    echo "FAIL"
+    sed 's/^/    /' .e2e/logs/probe.out
+    fail=$((fail + 1))
+fi
+
 echo "----"
 if [ "$fail" -eq 0 ]; then
     echo "ALL PROBES OK"

@@ -1,0 +1,3 @@
+#!/bin/sh
+# Sahte systemctl: birim dosyalarını gerçekten etkinleştirmeden başarı döndür.
+exit 0

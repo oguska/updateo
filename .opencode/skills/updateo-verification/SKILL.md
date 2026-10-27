@@ -84,6 +84,8 @@ rustfmt --edition 2024 src/<file>.rs   # only when the diff is yours
 17. `updateo --version` matches the version in `Cargo.toml`.
 18. `updateo configure` writes a normalized config (time `7:05` -> `07:05`)
     under a temporary `XDG_CONFIG_HOME`.
+19. `install-timer` writes the units under
+    `$XDG_CONFIG_HOME/systemd/user`, not under the updateo config directory.
 
 The bootstrap script is not a probe: it builds and installs the binary, so run
 it manually with a temporary `UPDATEO_BINDIR` and `XDG_CONFIG_HOME` plus a fake

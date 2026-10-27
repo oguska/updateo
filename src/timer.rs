@@ -6,11 +6,19 @@
 use crate::config::{self, Config};
 use crate::i18n::tr;
 use std::io;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
+fn unit_dir_from(config_dir: &Path) -> PathBuf {
+    config_dir
+        .parent()
+        .unwrap_or_else(|| Path::new("."))
+        .join("systemd")
+        .join("user")
+}
+
 fn unit_dir() -> io::Result<PathBuf> {
-    Ok(config::dir()?.join("systemd").join("user"))
+    Ok(unit_dir_from(&config::dir()?))
 }
 
 fn service_text(exe: &str, config: &Config) -> String {
@@ -98,20 +106,30 @@ pub fn install() -> io::Result<()> {
         )
     );
     systemctl(&["--user", "daemon-reload"])?;
-    systemctl(&["--user", "enable", "--now", "updateo.timer"])?;
-    println!(
-        "{}",
-        tr(
-            &format!(
-                "timer installed: daily {} (+up to 15 min jitter), Persistent=true; run 'updateo uninstall-timer' to remove",
-                config.check_time
-            ),
-            &format!(
-                "zamanlayıcı kuruldu: günlük {} (+15 dk titrek), Persistent=true; kaldırmak için 'updateo uninstall-timer' çalıştırın",
-                config.check_time
+    let enabled = systemctl(&["--user", "enable", "--now", "updateo.timer"])?;
+    if enabled {
+        println!(
+            "{}",
+            tr(
+                &format!(
+                    "timer installed: daily {} (+up to 15 min jitter), Persistent=true; run 'updateo uninstall-timer' to remove",
+                    config.check_time
+                ),
+                &format!(
+                    "zamanlayıcı kuruldu: günlük {} (+15 dk titrek), Persistent=true; kaldırmak için 'updateo uninstall-timer' çalıştırın",
+                    config.check_time
+                )
             )
-        )
-    );
+        );
+    } else {
+        println!(
+            "{}",
+            tr(
+                "units written, but the timer is not enabled; enable it manually after fixing systemctl",
+                "birimler yazıldı ama zamanlayıcı etkinleştirilmedi; systemctl sorununu giderdikten sonra elle etkinleştirin"
+            )
+        );
+    }
     Ok(())
 }
 
@@ -135,6 +153,14 @@ pub fn uninstall() -> io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn birim_dizini_xdg_config_altinda() {
+        assert_eq!(
+            unit_dir_from(Path::new("/home/u/.config/updateo")),
+            Path::new("/home/u/.config/systemd/user")
+        );
+    }
 
     #[test]
     fn unit_metinleri() {

@@ -29,7 +29,7 @@ serde/serde_json, chrono.
 | `src/history.rs` | SQLite history at `$XDG_DATA_HOME/updateo/history.db`; one-time `history.jsonl` import; `record`, `load`, `is_success`. |
 | `src/runner.rs` | `run_suspended`: leaves raw mode/alternate screen, runs a child on the real TTY, restores the TUI. |
 | `src/i18n.rs` | `tr(en, tr)`; language from `LC_ALL` → `LC_MESSAGES` → `LANG`; `tr` prefix means Turkish, everything else English. |
-| `src/timer.rs` | systemd-user service/timer text from config (daily time, `check` vs `update --yes`) and `systemctl --user` install/uninstall. |
+| `src/timer.rs` | systemd-user service/timer text from config (daily time, `check` vs `update --yes`) at `$XDG_CONFIG_HOME/systemd/user`, and `systemctl --user` install/uninstall. |
 
 ## Data flow
 
