@@ -667,13 +667,29 @@ impl App {
                     }
                 }
             }
-            KeyCode::Down => sess.move_cursor(1),
-            KeyCode::Up => sess.move_cursor(-1),
-            KeyCode::PageDown => sess.move_cursor(10),
-            KeyCode::PageUp => sess.move_cursor(-10),
-            KeyCode::Home => sess.cursor = 0,
+            KeyCode::Down => {
+                sess.move_cursor(1);
+                self.search = Some(sess);
+            }
+            KeyCode::Up => {
+                sess.move_cursor(-1);
+                self.search = Some(sess);
+            }
+            KeyCode::PageDown => {
+                sess.move_cursor(10);
+                self.search = Some(sess);
+            }
+            KeyCode::PageUp => {
+                sess.move_cursor(-10);
+                self.search = Some(sess);
+            }
+            KeyCode::Home => {
+                sess.cursor = 0;
+                self.search = Some(sess);
+            }
             KeyCode::End => {
                 sess.cursor = sess.hits.len().saturating_sub(1);
+                self.search = Some(sess);
             }
             KeyCode::Char('i') if k.modifiers.contains(KeyModifiers::CONTROL) => {
                 let hit = sess.selected().cloned();
@@ -2483,5 +2499,45 @@ mod tests {
         assert_eq!(session.plan[0].names, ["sed", "nano"]);
         assert_eq!(session.plan[1].src, Source::Aur);
         assert_eq!(session.plan[1].names, ["tribler"]);
+    }
+
+    #[test]
+    fn arama_gezinme_tuslari_pencereyi_kapatmaz() {
+        let hits = ["sed", "nano", "tribler"]
+            .into_iter()
+            .map(|name| sources::SearchHit {
+                source: Source::Pacman,
+                repo: "extra".into(),
+                name: name.into(),
+                version: "1.0-1".into(),
+                description: String::new(),
+                installed: false,
+            })
+            .collect();
+        let mut app = App::new();
+        app.search = Some(SearchState {
+            src: Source::Pacman,
+            input: Input::new("nano".into()),
+            query: "nano".into(),
+            hits,
+            cursor: 0,
+            scroll: 0,
+            loading: false,
+            started: None,
+            error: None,
+            id: 1,
+        });
+        let steps = [
+            (KeyCode::Down, 1),
+            (KeyCode::Down, 2),
+            (KeyCode::Up, 1),
+            (KeyCode::Home, 0),
+            (KeyCode::End, 2),
+        ];
+        for (code, expected) in steps {
+            app.on_search_key(KeyEvent::new(code, KeyModifiers::NONE));
+            let sess = app.search.as_ref().expect("arama penceresi kapanmamalı");
+            assert_eq!(sess.cursor, expected, "{code:?} sonrası imleç");
+        }
     }
 }

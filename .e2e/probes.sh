@@ -133,6 +133,12 @@ run "details sidebar opens on wide terminal" \
     --expect "details · nano" --expect "Name            : nano" \
     --expect "Repository      : extra"
 
+# 15) arama sonuçlarında ok tuşları popup'ı kapatmaz; Down ikinci sonucu seçer
+run "search arrows keep the popup open" \
+    env LC_ALL=en_US.UTF-8 python3 .e2e/screen_dump.py .e2e/xdgA "s e<CR><DOWN><CR>" \
+    --width 100 --height 30 \
+    --expect "details · extra/nano" --expect "Name            : nano"
+
 echo "----"
 if [ "$fail" -eq 0 ]; then
     echo "ALL PROBES OK"

@@ -69,6 +69,7 @@ rustfmt --edition 2024 src/<file>.rs   # only when the diff is yours
 12. Esc on the apply popup cancels and leaves `sudo.log` empty.
 13. `u` + `y` confirms and reaches the wrapper with `pacman -Syu nano sed`.
 14. `d` on a wide terminal opens the details sidebar with `pacman -Si` output.
+15. Search arrow keys keep the popup open; Down + Enter opens the second hit.
 
 The harness is `.e2e/screen_dump.py`:
 
