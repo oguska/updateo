@@ -1270,8 +1270,9 @@ impl App {
     pub fn draw(&mut self, f: &mut Frame) {
         let area = f.area();
         let hero = area.width >= 64 && area.height >= 18;
-        let [hero_area, tabs_area, list_area, status_area] = Layout::vertical([
+        let [hero_area, tabs_area, hint_area, list_area, status_area] = Layout::vertical([
             Constraint::Length(if hero { 2 } else { 0 }),
+            Constraint::Length(1),
             Constraint::Length(1),
             Constraint::Min(3),
             Constraint::Length(1),
@@ -1287,7 +1288,7 @@ impl App {
             f.render_widget(title, hero_area);
         }
 
-        // Sekme çubuğu: "pacman (seçili/toplam)" rozetleri + kısayol ipucu
+        // Sekme çubuğu: "pacman (seçili/toplam)" rozetleri; kısayollar alt satırda.
         let mut spans = Vec::new();
         for i in 0..TAB_COUNT {
             let text = if i < Source::ALL.len() {
@@ -1310,14 +1311,18 @@ impl App {
             };
             spans.push(Span::styled(text, style));
         }
-        spans.push(Span::styled(
-            tr(
-                "   / filter · s search · d details · space select · a all · r refresh · R refresh db · i install · x/X remove · u apply · q quit",
-                "   / filtre · s ara · d ayrıntı · space seçim · a tümünü · r yenile · R db tazele · i kur · x/X kaldır · u güncelle · q çık",
-            ),
-            Style::new().fg(Color::DarkGray),
-        ));
         f.render_widget(Paragraph::new(Line::from(spans)), tabs_area);
+        // Kısayol ipucu sekme rozetlerinin altında ayrı satırda.
+        f.render_widget(
+            Paragraph::new(Line::from(Span::styled(
+                tr(
+                    " / filter · s search · d details · space select · a all · r refresh · R refresh db · i install · x/X remove · u apply · q quit",
+                    " / filtre · s ara · d ayrıntı · space seçim · a tümünü · r yenile · R db tazele · i kur · x/X kaldır · u güncelle · q çık",
+                ),
+                Style::new().fg(Color::DarkGray),
+            ))),
+            hint_area,
+        );
 
         // Liste: ayrıntı paneli açıksa sağdan yer ayır.
         let (list_area, detail_area) =
