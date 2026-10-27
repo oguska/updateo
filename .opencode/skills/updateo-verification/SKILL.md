@@ -85,6 +85,9 @@ rustfmt --edition 2024 src/<file>.rs   # only when the diff is yours
    title.
 10. `s nano` + Enter searches `pacman -Ss`; Ctrl+D opens details via
     `pacman -Si extra/nano`, and a second Enter installs the selected result.
+10c. Flatpak search (`3s brave`) + Ctrl+D opens an uninstalled result's details
+    via `flatpak remote-info flathub com.brave.Browser` (fake `info` fails for
+    uninstalled apps), and the status must not show `not installed`.
 11. `u` previews the apply plan, including `pacman -Syu`, without running it.
 12. Esc on the apply popup cancels and leaves `sudo.log` empty.
 13. `u` + `y` confirms and reaches the wrapper with `pacman -Syu nano sed`;

@@ -24,7 +24,8 @@ listeler, paket paket seçmene olanak tanır ve güncellemeleri doğrudan uygula
 - `s` ile paket arama: geçerli kaynağın `pacman -Ss` / `yay -Ss` /
   `flatpak search` sonuçları popup'ta; Enter seçili sonucu kurar, Ctrl+D ayrıntı
 - `d` ile paket ayrıntısı: geniş uçbirimde sağ panel, dar uçbirimde popup
-  (`pacman -Qi/-Si`, `yay -Si`, `flatpak info`)
+  (`pacman -Qi/-Si`, `yay -Si`, `flatpak info` / kurulu olmayan aramalarda
+  `flatpak remote-info`)
 - Görsel yenileme: `tui-scrollbar` ile liste/geçmiş kaydırma çubuğu, geniş
   uçbirimde big-text başlık, kontrol sırasında braille spinner + `tamamlanan/toplam`
   + kalan süre tahmini
@@ -163,7 +164,7 @@ git push origin v0.3.0
 |---------|----------------------------------|--------------------------|-----------------|
 | pacman  | `checkupdates` (pacman-contrib), yoksa `pacman -Qu` | `sudo pacman -Syu <pkgler>` | `pacman -Ss` / `pacman -Qi`, `pacman -Si depo/ad` |
 | AUR     | `yay -Qua`                       | `yay -S <pkgler>`        | `yay -Ss` / `yay -Si` |
-| Flatpak | `flatpak remote-ls --updates`    | `flatpak update <refler>` | `flatpak search` / `flatpak info` |
+| Flatpak | `flatpak remote-ls --updates`    | `flatpak update <refler>` | `flatpak search` / `flatpak info`, `flatpak remote-info depo/ad` |
 
 Notlar:
 - Repo listesi önbellekteki veritabanlarına bakar; en taze sonuç için `R` ile
@@ -174,8 +175,10 @@ Notlar:
   gibi önek argümanlar da desteklenir).
 - AUR sorgusu ağ ister (yay, AUR RPC API'sine bakar).
 - `s` araması geçerli sekmenin kaynağında çalışır; AUR sonuçlarında repo
-  `aur` değilse sonuç pacman paketi sayılır. `d`/Enter ayrıntısı seçili
-  sürümün kaynağına göre `-Si`, `-Qi` veya `flatpak info` kullanır.
+  `aur` değilse sonuç pacman paketi sayılır. `d` (arama içinde Ctrl+D)
+  ayrıntısı seçili sürümün kaynağına göre `-Si`, `-Qi` veya Flatpak için
+  `info` / `remote-info` kullanır; Flatpak aramasında remote adı da saklanır,
+  böylece kurulu olmayan sonuç `flatpak remote-info <remote> <ad>` ile açılır.
 - `u` planı seçili paketleri kaynak bazında gruplar; onay penceresinde her
   kaynağın çalıştırılacak komutu görünür. Filter yalnız görünümü daralttığı
   için gizlenen seçili paketler de plana girer.

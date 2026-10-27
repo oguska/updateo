@@ -95,11 +95,14 @@ serde/serde_json, chrono.
 - Remove: pacman/AUR `pacman -Rns <names>`, Flatpak `flatpak uninstall <names>`.
   The in-app removal popup is the confirmation step.
 - Search: pacman `pacman -Ss <query>`, AUR `yay -Ss <query>`, Flatpak
-  `flatpak search <query> --columns=application,name,version,description`.
+  `flatpak search <query>
+  --columns=application,name,version,description,remote` (the remote is kept
+  in `SearchHit.repo` but hidden in the display name).
   Queries are single args and reject a leading `-`.
 - Details: pacman `-Qi`, or `-Si repo/name` when a repo is known, falling
   back to `-Qi`; AUR `yay -Si`, falling back to `pacman -Qi`; Flatpak
-  `flatpak info`.
+  `flatpak info`, falling back to `flatpak remote-info <remote> <app>` for
+  search results that are not installed.
 - Update previews (`install_preview`, `remove_preview`, `apply_preview`) must
   match the real command and are shown on the input line / popups.
 

@@ -4,6 +4,12 @@ All notable changes to updateo are documented here. The project follows
 [Semantic Versioning](https://semver.org/): the version is defined once in
 `Cargo.toml` and exposed by `updateo --version`.
 
+## Unreleased
+
+- Fix Flatpak search details for apps that are not installed: remember the
+  search remote and fall back to `flatpak remote-info <remote> <app>` when
+  `flatpak info` has no local result.
+
 ## 0.2.2 — 2026-10-27
 
 - Search: Enter installs the selected result; Ctrl+D opens its details.

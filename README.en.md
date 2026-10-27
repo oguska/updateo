@@ -24,7 +24,8 @@ TUI, lets you pick packages individually, and applies them directly.
 - `s` package search: `pacman -Ss` / `yay -Ss` / `flatpak search` results in a
   popup; Enter installs the selected result, Ctrl+D opens its details
 - `d` package details: side panel on wide terminals, popup on narrow ones
-  (`pacman -Qi/-Si`, `yay -Si`, `flatpak info`)
+  (`pacman -Qi/-Si`, `yay -Si`, `flatpak info` / `flatpak remote-info` for
+  results that are not installed)
 - Visual refresh: `tui-scrollbar` on the list/history, big-text title on wide
   terminals, and a braille spinner + `done/total` + ETA while checking
 - `u`/`Enter` apply: a per-source plan popup opens first (`y`/Enter applies);
@@ -165,7 +166,7 @@ git push origin v0.3.0
 |---------|----------------------------------|--------------------------|------------------|
 | pacman  | `checkupdates` (pacman-contrib), fallback `pacman -Qu` | `sudo pacman -Syu <packages>` | `pacman -Ss` / `pacman -Qi`, `pacman -Si repo/name` |
 | AUR     | `yay -Qua`                       | `yay -S <packages>`      | `yay -Ss` / `yay -Si` |
-| Flatpak | `flatpak remote-ls --updates`    | `flatpak update <refs>`  | `flatpak search` / `flatpak info` |
+| Flatpak | `flatpak remote-ls --updates`    | `flatpak update <refs>`  | `flatpak search` / `flatpak info`, `flatpak remote-info remote/app` |
 
 Notes:
 - The repo list uses cached databases; for the freshest result press `R` to run
@@ -176,8 +177,10 @@ Notes:
   `UPDATEO_SUDO="doas -n"` are supported).
 - AUR queries need network access (yay uses the AUR RPC API).
 - `s` searches the current tab's source; when an AUR result has a repo other
-  than `aur`, it is treated as a pacman package. `d`/Enter details use `-Si`,
-  `-Qi`, or `flatpak info` according to the selected result's source.
+  than `aur`, it is treated as a pacman package. `d` (or Ctrl+D in search)
+  details use `-Si`, `-Qi`, or Flatpak `info` / `remote-info` according to the
+  selected result's source. Flatpak search also stores the remote, so an
+  uninstalled result opens with `flatpak remote-info <remote> <app>`.
 - The `u` plan groups selected packages by source; the confirmation popup shows
   the command for each source. The filter only narrows the view, so selected
   packages on hidden rows are still included.

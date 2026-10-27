@@ -113,6 +113,13 @@ run "search Enter installs the selected result" \
     --width 100 --height 30 \
     --log "FAKE-SUDO: pacman -S --noconfirm nano"
 
+# 10c) kurulu olmayan Flatpak araması: ayrıntı remote-info ile açılır
+run "flatpak search details use remote info" \
+    env LC_ALL=en_US.UTF-8 python3 .e2e/screen_dump.py .e2e/xdgA "3s brave<CR><C-D>" \
+    --width 100 --height 30 \
+    --expect "details · flathub/com.brave.Browser" \
+    --expect "Remote: flathub" --reject "not installed"
+
 # 11) uygulama onayı: plan görünür, henüz komut çalışmaz
 run "apply dialog previews the plan" \
     env LC_ALL=en_US.UTF-8 python3 .e2e/screen_dump.py .e2e/xdgA "u" \

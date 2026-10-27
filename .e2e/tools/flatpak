@@ -15,13 +15,28 @@ case "${1:-}" in
     awk -F'\t' -v q="$q" '$1 == "findfp" &&
       (index(tolower($2), tolower(q)) || index(tolower($3), tolower(q)) ||
        index(tolower($5), tolower(q))) {
-        printf "%s\t%s\t%s\t%s\n", $2, $3, $4, $5
+        printf "%s\t%s\t%s\t%s\t%s\n", $2, $3, $4, $5, $6
       }' "$db" ;;
   info)
     app=${2:-}
     [ -n "$app" ] || exit 1
-    awk -F'\t' -v a="$app" '$1 == "findfp" && $2 == a {
-      printf "ID: %s\nName: %s\nVersion: %s\nDescription: %s\n", $2, $3, $4, $5
+    awk -F'\t' -v a="$app" '
+      $1 == "fpinst" && $2 == a { installed = 1; local_version = $3 }
+      $1 == "findfp" && $2 == a { name = $3; remote_version = $4; desc = $5; found = 1 }
+      END {
+        if (!installed) exit 1
+        if (found) {
+          printf "ID: %s\nName: %s\nVersion: %s\nDescription: %s\n", a, name, remote_version, desc
+        } else {
+          printf "ID: %s\nVersion: %s\n", a, local_version
+        }
+      }' "$db" ;;
+  remote-info)
+    remote=${2:-}
+    app=${3:-}
+    [ -n "$remote" ] && [ -n "$app" ] || exit 1
+    awk -F'\t' -v r="$remote" -v a="$app" '$1 == "findfp" && $2 == a && $6 == r {
+      printf "Remote: %s\nID: %s\nName: %s\nVersion: %s\nDescription: %s\n", $6, $2, $3, $4, $5
       found = 1
     } END { exit found ? 0 : 1 }' "$db" ;;
   install) shift; echo "FAKE-SUDO: flatpak install $*" >> "${FAKE_SUDO_LOG:?}" ;;

@@ -49,7 +49,8 @@ pub struct Update {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SearchHit {
     pub source: Source,
-    /// Depo adı (`extra`, `aur`…); Flatpak'ta boş.
+    /// Depo adı (`extra`, `aur`, Flatpak remote); Flatpak'ta yalnız uygulama
+    /// kimliği gösterilir.
     pub repo: String,
     /// Kurulum komutuna giden çıplak ad / uygulama kimliği.
     pub name: String,
@@ -59,9 +60,9 @@ pub struct SearchHit {
 }
 
 impl SearchHit {
-    /// Listede gösterilecek `depo/ad` biçimi.
+    /// Listede gösterilecek `depo/ad` biçimi; Flatpak'ta remote gizlenir.
     pub fn display(&self) -> String {
-        if self.repo.is_empty() {
+        if self.repo.is_empty() || self.source == Source::Flatpak {
             self.name.clone()
         } else {
             format!("{}/{}", self.repo, self.name)
@@ -489,7 +490,7 @@ pub fn search(src: Source, query: &str) -> Result<Vec<SearchHit>, String> {
             &[
                 "search",
                 query,
-                "--columns=application,name,version,description",
+                "--columns=application,name,version,description,remote",
             ],
         ))?,
     };
@@ -552,7 +553,8 @@ fn parse_search_lines(text: &str, source: Source) -> Vec<SearchHit> {
     hits
 }
 
-/// `flatpak search --columns=application,name,version,description` satırları.
+/// `flatpak search --columns=application,name,version,description,remote`
+/// satırları. Remote, kurulu olmayan sonuçların ayrıntısı için saklanır.
 fn parse_flatpak_search(text: &str) -> Vec<SearchHit> {
     let mut hits = Vec::new();
     for line in text.lines() {
@@ -562,7 +564,7 @@ fn parse_flatpak_search(text: &str) -> Vec<SearchHit> {
         };
         hits.push(SearchHit {
             source: Source::Flatpak,
-            repo: String::new(),
+            repo: cols.get(4).copied().unwrap_or("").to_string(),
             name: app.to_string(),
             version: cols.get(2).copied().unwrap_or("").to_string(),
             description: cols.get(3).copied().unwrap_or("").to_string(),
@@ -572,27 +574,49 @@ fn parse_flatpak_search(text: &str) -> Vec<SearchHit> {
     hits
 }
 
+/// Ayrıntı komutları için: çıkış kodu 0 olsa bile boş çıktı başarısızdır.
+/// `capture` güncelleme kontrollerinde exit 1'i "güncelleme yok" sayar; burada
+/// `flatpak info` gibi komutların boş sonucu fallback'i tetiklemelidir.
+fn capture_details(cmd: Command) -> Result<String, String> {
+    let out = capture(cmd)?;
+    if out.trim().is_empty() {
+        return Err(tr("no details returned", "ayrıntı döndürülmedi"));
+    }
+    Ok(out)
+}
+
 /// Seçili paketin ayrıntıları: pacman `-Qi` (kurulu) / `-Si` (depo),
-/// AUR `yay -Si`, Flatpak `flatpak info`. Satırlar panelde gösterilir.
+/// AUR `yay -Si`, Flatpak `remote-info` (arama sonucu) / `info` (kurulu).
+/// Satırlar panelde gösterilir.
 pub fn package_details(src: Source, repo: &str, name: &str) -> Result<Vec<String>, String> {
     let out = match src {
         Source::Pacman => {
             let primary = if repo.is_empty() {
-                capture(cmd("pacman", &["-Qi", name]))
+                capture_details(cmd("pacman", &["-Qi", name]))
             } else {
                 let reference = format!("{repo}/{name}");
-                capture(cmd("pacman", &["-Si", &reference]))
+                capture_details(cmd("pacman", &["-Si", &reference]))
             };
             match primary {
                 Ok(out) => out,
-                Err(_) => capture(cmd("pacman", &["-Qi", name]))?,
+                Err(_) => capture_details(cmd("pacman", &["-Qi", name]))?,
             }
         }
-        Source::Aur => match capture(cmd("yay", &["-Si", name])) {
+        Source::Aur => match capture_details(cmd("yay", &["-Si", name])) {
             Ok(out) => out,
-            Err(_) => capture(cmd("pacman", &["-Qi", name]))?,
+            Err(_) => capture_details(cmd("pacman", &["-Qi", name]))?,
         },
-        Source::Flatpak => capture(cmd("flatpak", &["info", name]))?,
+        Source::Flatpak => {
+            // Kurulu sonuçta `info` yerel ayrıntı verir. Kurulu değilse
+            // `info` "not installed" der; remote biliniyorsa remote-info dene.
+            match capture_details(cmd("flatpak", &["info", name])) {
+                Ok(out) => out,
+                Err(_) if !repo.is_empty() => {
+                    capture_details(cmd("flatpak", &["remote-info", repo, name]))?
+                }
+                Err(e) => return Err(e),
+            }
+        }
     };
     Ok(out
         .lines()
@@ -841,10 +865,14 @@ mod tests {
         assert_eq!(hits[1].source, Source::Aur);
         assert_eq!(hits[1].name, "tribler");
 
-        let fp = parse_flatpak_search("com.microsoft.Edge\tMicrosoft Edge\t156.0\tFast browser\n");
+        let fp = parse_flatpak_search(
+            "com.microsoft.Edge\tMicrosoft Edge\t156.0\tFast browser\tflathub\n",
+        );
         assert_eq!(fp.len(), 1);
         assert_eq!(fp[0].source, Source::Flatpak);
         assert_eq!(fp[0].name, "com.microsoft.Edge");
+        assert_eq!(fp[0].repo, "flathub");
+        assert_eq!(fp[0].display(), "com.microsoft.Edge");
         assert_eq!(fp[0].version, "156.0");
         assert_eq!(fp[0].description, "Fast browser");
     }
