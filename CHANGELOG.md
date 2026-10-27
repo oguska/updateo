@@ -16,6 +16,8 @@ All notable changes to updateo are documented here. The project follows
 - Add `install-autostart` / `uninstall-autostart` XDG autostart entries.
 - Add `--version` and show the version in the TUI title.
 - Add English documentation in `README.en.md`.
+- Add GitHub Actions CI (tests, clippy, release build, PTY probes) and a
+  tag-driven release workflow that publishes a static musl binary and checksums.
 - Fix the TUI repaint after update/install/removal: reset ratatui's buffer when
   returning from a suspended command so tabs, hints, and list borders remain.
 

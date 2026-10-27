@@ -1,4 +1,5 @@
 /target
+/dist
 
 # uçtan uca korniş (fake pty) ürettikleri: sabit kalıplar değil
 .e2e/logs/

@@ -1,5 +1,8 @@
 # updateo
 
+[![CI](https://github.com/oguska/updateo/actions/workflows/ci.yml/badge.svg)](https://github.com/oguska/updateo/actions/workflows/ci.yml)
+[![Release](https://github.com/oguska/updateo/actions/workflows/release.yml/badge.svg)](https://github.com/oguska/updateo/actions/workflows/release.yml)
+
 English · [Türkçe](README.md)
 
 A single-interface update manager for Arch-based systems (Arch, CachyOS,
@@ -131,6 +134,30 @@ UPDATEO_CHECK_TIME=09:30 UPDATEO_AUTOSTART=yes ./bootstrap.sh
 Set `UPDATEO_BINDIR` to change the install directory. The version comes from
 `package.version` in `Cargo.toml`; `updateo --version` and the TUI title show
 the same value. Changes are recorded in `CHANGELOG.md`.
+
+## CI and releases
+
+Every push to `main` and every pull request runs the `CI` workflow: unit tests,
+clippy with warnings denied, a release build, and the PTY end-to-end probes.
+
+Pushing a `v*` tag runs the `Release` workflow. The tag must match
+`package.version` in `Cargo.toml` and `CHANGELOG.md` must have a matching
+section. After the tests pass, it builds a statically linked musl binary,
+packages it, writes `SHA256SUMS`, and publishes a GitHub release. The release
+archive contains the binary plus both READMEs and the changelog:
+
+```sh
+tar -xzf updateo-<version>-x86_64-unknown-linux-musl.tar.gz
+sudo install -Dm755 updateo-<version>-x86_64-unknown-linux-musl/updateo /usr/local/bin/updateo
+```
+
+To publish a version, update the version in `Cargo.toml` and add its section to
+`CHANGELOG.md`, then tag the commit:
+
+```sh
+git tag v0.3.0
+git push origin v0.3.0
+```
 
 ## How it works
 

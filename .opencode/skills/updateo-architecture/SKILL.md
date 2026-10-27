@@ -30,6 +30,8 @@ serde/serde_json, chrono.
 | `src/runner.rs` | `run_suspended`: leaves raw mode/alternate screen, runs a child on the real TTY, restores the TUI. |
 | `src/i18n.rs` | `tr(en, tr)`; language from `LC_ALL` → `LC_MESSAGES` → `LANG`; `tr` prefix means Turkish, everything else English. |
 | `src/timer.rs` | systemd-user service/timer text from config (daily time, `check` vs `update --yes`) at `$XDG_CONFIG_HOME/systemd/user`, and `systemctl --user` install/uninstall. |
+| `.github/workflows/ci.yml` | Push/PR checks: locked tests, clippy, release build, PTY probes. |
+| `.github/workflows/release.yml` | `v*` tags: verify tag/version/changelog, test, build static musl binary, package, checksum, publish release. |
 
 ## Data flow
 

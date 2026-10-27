@@ -1,5 +1,8 @@
 # updateo
 
+[![CI](https://github.com/oguska/updateo/actions/workflows/ci.yml/badge.svg)](https://github.com/oguska/updateo/actions/workflows/ci.yml)
+[![Release](https://github.com/oguska/updateo/actions/workflows/release.yml/badge.svg)](https://github.com/oguska/updateo/actions/workflows/release.yml)
+
 [English](README.en.md) · Türkçe
 
 Arch tabanlı sistemler (Arch, CachyOS, Manjaro…) için tek arayüzden güncelleme
@@ -128,6 +131,31 @@ UPDATEO_CHECK_TIME=09:30 UPDATEO_AUTOSTART=yes ./bootstrap.sh
 Hedef dizin `UPDATEO_BINDIR` ile değiştirilebilir. Sürüm `Cargo.toml` içindeki
 `package.version` değerinden gelir; `updateo --version` ve TUI başlığı aynı
 değeri gösterir. Değişiklikler `CHANGELOG.md` içinde tutulur.
+
+## CI ve sürümler
+
+`main` dalına her push ve her pull request `CI` iş akışını çalıştırır: birim
+testleri, uyarıları hata sayan clippy, release derlemesi ve PTY uçtan uca
+testleri.
+
+`v*` biçiminde bir etiket push edildiğinde `Release` iş akışı çalışır. Etiket
+`Cargo.toml` içindeki `package.version` ile eşleşmeli ve `CHANGELOG.md` aynı
+sürüm için bir bölüm içermelidir. Testler geçtikten sonra statik musl binary
+derlenir, arşivlenir, `SHA256SUMS` üretilir ve GitHub sürümü yayınlanır. Arşiv
+binary ile birlikte iki README'yi ve changelog'u içerir:
+
+```sh
+tar -xzf updateo-<sürüm>-x86_64-unknown-linux-musl.tar.gz
+sudo install -Dm755 updateo-<sürüm>-x86_64-unknown-linux-musl/updateo /usr/local/bin/updateo
+```
+
+Sürüm yayınlamak için `Cargo.toml` sürümünü ve `CHANGELOG.md` bölümünü
+güncelleyip commit'i etiketleyin:
+
+```sh
+git tag v0.3.0
+git push origin v0.3.0
+```
 
 ## Nasıl çalışıyor
 

@@ -41,6 +41,19 @@ sh .e2e/probes.sh
   `UPDATEO_NOTIFY`/`UPDATEO_UNATTENDED`/`UPDATEO_CHECK_TIME`/
   `UPDATEO_AUTOSTART` variables, with a fake `systemctl` first in `PATH`.
 
+## Workflow changes
+
+For `.github/workflows` edits:
+
+- Parse both files with Python YAML (`yaml.safe_load`) to catch syntax errors.
+- Extract each `run:` block and run `bash -n` on it; CI uses bash on Ubuntu.
+- Keep the release guards: tag must equal `Cargo.toml` `package.version`, and
+  `CHANGELOG.md` must contain that version's section.
+- The package step can be dry-run outside CI by creating a temporary
+  `target/x86_64-unknown-linux-musl/release/updateo`, setting
+  `UPDATEO_VERSION`, and running the extracted packaging script; inspect the
+  tarball, `SHA256SUMS`, and `release-notes.md`.
+
 ## Formatting
 
 The repository is not fully rustfmt-clean: `app.rs` has pre-existing formatting
