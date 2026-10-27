@@ -124,7 +124,8 @@ test -s .e2e/sudo.log && { echo "    FAIL: iptal sonrası sudo.log dolu"; fail=$
 run "confirmed apply reaches the wrapper" \
     env LC_ALL=en_US.UTF-8 python3 .e2e/screen_dump.py .e2e/xdgA "uy" \
     --width 100 --height 30 \
-    --log "FAKE-SUDO: pacman -Syu nano sed"
+    --log "FAKE-SUDO: pacman -Syu nano sed" \
+    --expect "pacman (2/2)" --expect "/ filter" --expect "Arch updater"
 
 # 14) geniş uçbirimde ayrıntı sağ panelde açılır (arama yokken)
 run "details sidebar opens on wide terminal" \

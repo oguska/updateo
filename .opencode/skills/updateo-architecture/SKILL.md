@@ -33,7 +33,9 @@ serde/serde_json, chrono.
 
 ## Data flow
 
-1. `main::run_tui` creates `App`, calls `App::start_refresh`, then loops
+1. `main::run_tui` creates `App`, calls `App::start_refresh`, then loops:
+   if `app.take_redraw()` is true, resize the terminal to its current area
+   (this clears the screen and resets ratatui's back buffer); then
    `terminal.draw(|f| app.draw(f))` and `app.handle_events()`.
 2. `spawn_checks` starts one thread per `Source::ALL` and sends `CheckMsg`
    through an mpsc channel; `drain` collects results, lowers `checking`, and
@@ -51,8 +53,10 @@ serde/serde_json, chrono.
    confirmation; `i` installs; `x`/`X` removes; `q`/Esc quits. Esc clears a
    non-empty filter before it quits.
 6. `run_suspended` is used for every command that may need sudo/polkit or an
-   interactive package-manager flow. The TUI is restored afterward and history
-   is recorded before `spawn_checks`.
+   interactive package-manager flow. It sets `App::force_redraw`; the main loop
+   consumes that flag and resets ratatui's buffer so tabs, hints, and borders
+   are repainted after the alternate screen is restored. History is recorded
+   before `spawn_checks`.
 7. `cmd_check` prints per-source counts. With `--notify` and updates present it
    runs `notify-send` with a single `update` action (45 s timeout, `-w`).
    Selecting the action returns `update` on stdout; `launch_tui` then opens the

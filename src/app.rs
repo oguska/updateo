@@ -10,7 +10,7 @@ use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Paragraph, Wrap};
-use std::process::Command;
+use std::process::{Command, ExitStatus};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -198,6 +198,9 @@ pub struct App {
     search_next_id: u64,
     last_check: Option<Instant>,
     check_started: Option<Instant>,
+    /// Askıya alınmış TUI döndükten sonra ratatui'nin ön belleği terminalle
+    /// uyuşmaz; ana döngü bu bayrakla ekranı/önbelleği sıfırlayıp tam çizer.
+    force_redraw: bool,
 }
 
 impl App {
@@ -230,6 +233,7 @@ impl App {
             search_next_id: 0,
             last_check: None,
             check_started: None,
+            force_redraw: false,
         }
     }
 
@@ -238,6 +242,21 @@ impl App {
         self.status = tr("Checking for updates…", "Güncellemeler kontrol ediliyor…");
         self.status_err = false;
         self.spawn_checks();
+    }
+
+    /// Askıya alınmış TUI'yi çalıştır; dönüşte tam yeniden çizim iste.
+    /// `runner` alternatif ekranı temizleyip geri açar, fakat ratatui'nin
+    /// önceki-kare önbelleği eski içeriği hatırlar; önbellek sıfırlanmadan
+    /// değişmeyen sekmeler/kenarlıklar yeniden çizilmez.
+    fn run_suspended(&mut self, cmd: &mut Command) -> std::io::Result<ExitStatus> {
+        let result = runner::run_suspended(cmd);
+        self.force_redraw = true;
+        result
+    }
+
+    /// Ana döngü: tam yeniden çizim gerekiyorsa bayrağı tüket.
+    pub fn take_redraw(&mut self) -> bool {
+        std::mem::take(&mut self.force_redraw)
     }
 
     /// Thread'leri başlat; durumu (mesajı) çağıranın yönetmesine bırak —
@@ -753,7 +772,7 @@ impl App {
         );
         self.status_err = false;
         let mut cmd = sources::root_command("pacman", &["-Sy"]);
-        match runner::run_suspended(&mut cmd) {
+        match self.run_suspended(&mut cmd) {
             Ok(st) if st.success() => {
                 self.status = tr(
                     "Database refreshed, rechecking…",
@@ -798,7 +817,7 @@ impl App {
                 }
             };
             cmd.args(&names);
-            match runner::run_suspended(&mut cmd) {
+            match self.run_suspended(&mut cmd) {
                 Ok(st) if st.success() => history::record(src.label(), "ok", &names),
                 Ok(st) => {
                     history::record(src.label(), &format!("failed ({st})"), &names);
@@ -859,7 +878,7 @@ impl App {
             &format!("{list}, {} ile kuruluyor…", src.label()),
         );
         self.status_err = false;
-        let outcome = match runner::run_suspended(&mut cmd) {
+        let outcome = match self.run_suspended(&mut cmd) {
             Ok(st) if st.success() => {
                 self.status = tr(&format!("{list} installed."), &format!("{list} kuruldu."));
                 "ok".to_string()
@@ -964,7 +983,7 @@ impl App {
             &format!("{list}, {} ile kaldırılıyor…", src.label()),
         );
         self.status_err = false;
-        let outcome = match runner::run_suspended(&mut cmd) {
+        let outcome = match self.run_suspended(&mut cmd) {
             Ok(st) if st.success() => {
                 self.status = tr(&format!("{list} removed."), &format!("{list} kaldırıldı."));
                 "removed".to_string()
@@ -2225,6 +2244,15 @@ mod tests {
         assert_eq!(s.cursor, 0);
         s.move_cursor(isize::MAX);
         assert_eq!(s.cursor, 2);
+    }
+
+    #[test]
+    fn askidan_sonra_tam_cizim_istenir() {
+        let mut app = App::new();
+        assert!(!app.take_redraw());
+        app.force_redraw = true;
+        assert!(app.take_redraw());
+        assert!(!app.take_redraw());
     }
 
     #[test]

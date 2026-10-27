@@ -90,6 +90,15 @@ fn run_tui() -> io::Result<()> {
     app.start_refresh();
 
     while !app.quit {
+        // Askıya alınmış TUI'den dönüşte terminal temizlenmiş olabilir;
+        // ratatui önbelleğini de sıfırla ki tüm çerçeve yeniden çizilsin.
+        if app.take_redraw() {
+            // `resize` aynı alanla da çağrılabilir: ekranı temizleyip ratatui
+            // önbelleğini sıfırlar. `Terminal::clear` imleç konumu sorgular ve
+            // yanıt vermeyen terminallerde kilitlenebilir.
+            let area: ratatui::layout::Rect = terminal.size()?.into();
+            terminal.resize(area)?;
+        }
         terminal.draw(|f| app.draw(f))?;
         app.handle_events()?;
     }
