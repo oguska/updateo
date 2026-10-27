@@ -107,6 +107,12 @@ fn record_to(
     Ok(())
 }
 
+/// Kayıt başarıyla mı sonuçlandı? Başarı etiketleri sabit: `ok`
+/// (güncelleme/kurma) ve `removed` (kaldırma); gerisi başarısızlık sayılır.
+pub fn is_success(result: &str) -> bool {
+    matches!(result, "ok" | "removed")
+}
+
 /// Geçmişi en yeni üstte olacak şekilde yükle.
 pub fn load() -> Vec<Entry> {
     let db = db_path();
