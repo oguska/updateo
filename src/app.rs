@@ -552,10 +552,7 @@ impl App {
         self.status_err = false;
         let outcome = match runner::run_suspended(&mut cmd) {
             Ok(st) if st.success() => {
-                self.status = tr(
-                    &format!("{list} removed."),
-                    &format!("{list} kaldırıldı."),
-                );
+                self.status = tr(&format!("{list} removed."), &format!("{list} kaldırıldı."));
                 "removed".to_string()
             }
             Ok(st) => {
@@ -615,7 +612,10 @@ impl App {
                 _ => {}
             }
         }
-        if matches!(k.code, KeyCode::Enter | KeyCode::Char('y') | KeyCode::Char('Y')) {
+        if matches!(
+            k.code,
+            KeyCode::Enter | KeyCode::Char('y') | KeyCode::Char('Y')
+        ) {
             self.confirm_removal();
         }
     }
@@ -668,9 +668,7 @@ impl App {
                 KeyCode::Esc => {
                     self.status = match mode {
                         InputMode::Install => tr("Install cancelled.", "Kurulum iptal edildi."),
-                        InputMode::Remove => {
-                            tr("Removal cancelled.", "Kaldırma iptal edildi.")
-                        }
+                        InputMode::Remove => tr("Removal cancelled.", "Kaldırma iptal edildi."),
                     };
                     self.status_err = false;
                 }
@@ -983,9 +981,7 @@ impl App {
                 ),
                 Span::styled(
                     prefix,
-                    Style::new()
-                        .fg(label_color)
-                        .add_modifier(Modifier::BOLD),
+                    Style::new().fg(label_color).add_modifier(Modifier::BOLD),
                 ),
             ];
             for (i, c) in chars.iter().enumerate().skip(start).take(avail) {
@@ -1041,27 +1037,29 @@ impl App {
             return;
         };
         let src = sess.src;
-        let body_w = ((area.width as usize).saturating_sub(12)).clamp(44, 96);
-        let body_h = (area.height as usize).saturating_sub(8).clamp(6, 24);
+        // Küçük uçbirimde pencere taşmasın: kenarlıklar + pay için 6 hane düş.
+        let body_w = ((area.width as usize).saturating_sub(6)).clamp(18, 96);
+        // Gövde yüksekliği en fazla uçbirime sığan kadar; içerik azsa küçülür.
+        let max_h = (area.height as usize).saturating_sub(6).clamp(4, 24);
 
-        let mut lines: Vec<Line> = Vec::new();
-        lines.push(Line::from(Span::styled(
-            tr(
-                &format!(
-                    "{} target(s) · {} selected · {} blocked",
-                    sess.plan.len(),
-                    sess.included(),
-                    sess.blocked()
-                ),
-                &format!(
-                    "{} hedef · {} seçili · {} engelli",
-                    sess.plan.len(),
-                    sess.included(),
-                    sess.blocked()
-                ),
+        // Sayaç satırı sabit: liste kaydırılırken de hep görünür kalır.
+        let counts = tr(
+            &format!(
+                " · {} target(s) · {} selected · {} blocked ",
+                sess.plan.len(),
+                sess.included(),
+                sess.blocked()
             ),
-            Style::new().add_modifier(Modifier::BOLD),
-        )));
+            &format!(
+                " · {} hedef · {} seçili · {} engelli ",
+                sess.plan.len(),
+                sess.included(),
+                sess.blocked()
+            ),
+        );
+
+        // Kaydırılabilir liste: ipucu satırı + hedefler ve gerekçe/uyarı satırları.
+        let mut lines: Vec<Line> = Vec::new();
         lines.push(Line::from(Span::styled(
             tr(
                 "j/k move · space select · a all · y remove · Esc cancel",
@@ -1069,10 +1067,9 @@ impl App {
             ),
             Style::new().fg(Color::DarkGray),
         )));
-        lines.push(Line::from(""));
 
-        // İmlecin satır konumu: her hedef satırı + engelleme/not satırları.
-        let mut cursor_line = 3usize;
+        // İmlecin `lines` içindeki satır konumu: 0. satır ipucu satırı.
+        let mut cursor_line = 1usize;
         for (i, r) in sess.plan.iter().enumerate() {
             if i == sess.cursor {
                 break;
@@ -1125,8 +1122,7 @@ impl App {
                 } else {
                     tr("required by", "bunu isteyenler")
                 };
-                let shown: Vec<&str> =
-                    r.dependents.iter().take(6).map(String::as_str).collect();
+                let shown: Vec<&str> = r.dependents.iter().take(6).map(String::as_str).collect();
                 let more = r.dependents.len().saturating_sub(shown.len());
                 let tail = if more > 0 {
                     format!(" (+{more})")
@@ -1140,40 +1136,51 @@ impl App {
             }
         }
 
-        lines.push(Line::from(""));
-        let targets = sess.targets();
-        let command = if targets.is_empty() {
-            tr("(no target selected)", "(seçili hedef yok)").to_string()
-        } else {
-            format!("{} {}", sources::remove_preview(src), targets.join(" "))
+        let footer = {
+            let targets = sess.targets();
+            let command = if targets.is_empty() {
+                tr("(no target selected)", "(seçili hedef yok)").to_string()
+            } else {
+                format!("{} {}", sources::remove_preview(src), targets.join(" "))
+            };
+            // Komut satırı pencereye sığmalı; uzun listelerde sonu kısaltılır.
+            let label = format!("{} ", tr("command:", "komut:"));
+            let room = body_w.saturating_sub(label.chars().count() + 1);
+            let command = truncate(&command, room);
+            Line::from(vec![
+                Span::styled(label, Style::new().fg(Color::DarkGray)),
+                Span::styled(
+                    command,
+                    Style::new()
+                        .fg(if targets.is_empty() {
+                            Color::Red
+                        } else {
+                            Color::Cyan
+                        })
+                        .add_modifier(Modifier::BOLD),
+                ),
+            ])
         };
-        lines.push(Line::from(Span::styled(
-            tr("command:", "komut:"),
-            Style::new().fg(Color::DarkGray),
-        )));
-        lines.push(Line::from(Span::styled(
-            command,
-            Style::new()
-                .fg(if targets.is_empty() {
-                    Color::Red
-                } else {
-                    Color::Cyan
-                })
-                .add_modifier(Modifier::BOLD),
-        )));
 
-        // Pencere içinde kaydırma: imleç her zaman görünür satırda kalsın.
-        let inner = body_h.saturating_sub(2).max(1);
-        if cursor_line >= sess.scroll + inner {
-            sess.scroll = cursor_line + 1 - inner;
+        // Gövde üç parça: sabit sayaç, kayan liste, sabit komut önizlemesi.
+        let body_h = (lines.len() + 2).min(max_h).max(4);
+        let window = body_h.saturating_sub(2).max(1);
+        if cursor_line >= sess.scroll + window {
+            sess.scroll = cursor_line + 1 - window;
         }
         if cursor_line < sess.scroll {
             sess.scroll = cursor_line;
         }
         sess.scroll = sess.scroll.min(lines.len().saturating_sub(1));
+        let mut shown = vec![Line::from(Span::styled(
+            truncate(counts.trim(), body_w),
+            Style::new().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+        ))];
+        shown.extend(lines[sess.scroll..(sess.scroll + window).min(lines.len())].to_vec());
+        shown.push(footer);
 
         let body = KnownSizeWrapper {
-            inner: Paragraph::new(lines).scroll((sess.scroll as u16, 0)),
+            inner: Paragraph::new(shown),
             width: body_w,
             height: body_h,
         };
@@ -1203,7 +1210,11 @@ mod tests {
     fn target(name: &str, blocked: Option<&str>, deps: &[&str]) -> sources::Removal {
         sources::Removal {
             name: name.into(),
-            installed: if blocked.is_some() { None } else { Some("1.0-1".into()) },
+            installed: if blocked.is_some() {
+                None
+            } else {
+                Some("1.0-1".into())
+            },
             dependents: deps.iter().map(|d| (*d).to_string()).collect(),
             note: None,
             blocked: blocked.map(Into::into),
@@ -1257,5 +1268,90 @@ mod tests {
         assert_eq!(truncate("pacman 6.1.0", 8), "pacman 6…");
         // çok baytlı karakter tek gösterim hanesi sayılır
         assert_eq!(truncate("güncellendi", 6), "güncel…");
+    }
+
+    /// Onay penceresi küçük uçbirimde de çöker mi: kaydırma, sığdırma, panik yok.
+    fn render_at(
+        width: u16,
+        height: u16,
+        cursor: usize,
+        plan: Vec<sources::Removal>,
+    ) -> Vec<String> {
+        use ratatui::Terminal;
+        use ratatui::backend::TestBackend;
+
+        let mut app = App::new();
+        app.removal = Some(RemovalSession {
+            src: Source::Pacman,
+            plan,
+            cursor,
+            scroll: 0,
+        });
+        let mut term = Terminal::new(TestBackend::new(width, height)).unwrap();
+        let drawn = term.draw(|f| app.draw(f)).unwrap();
+        let buf = drawn.buffer;
+        (0..buf.area.height)
+            .map(|y| {
+                (0..buf.area.width)
+                    .map(|x| buf[(x, y)].symbol())
+                    .collect::<String>()
+            })
+            .collect()
+    }
+
+    /// Pencere gövdesi satırları (iç kenarlık satırları): ilki sayaç, sonu komut.
+    fn body(rows: &[String]) -> Vec<String> {
+        rows.iter()
+            .filter(|r| r.starts_with('│') || r.contains("│ "))
+            .cloned()
+            .collect()
+    }
+
+    #[test]
+    fn kaldirma_penceresi_kucuk_ekranda_cokmez() {
+        // 12 hedef, her birinin ters bağımlısı + engelli bir tanesi: uzun liste
+        let plan: Vec<sources::Removal> = (0..12)
+            .map(|i| {
+                if i == 3 {
+                    target("systemd", Some("korunan taban/sistem paketi"), &[])
+                } else {
+                    target(&format!("paket{i}"), None, &["liba", "libb", "libc"])
+                }
+            })
+            .collect();
+
+        for cursor in [0, 11] {
+            let rows = render_at(64, 14, cursor, plan.clone());
+            let text = rows.join("\n");
+            let body = body(&rows);
+            // kaydırma imleci görünür satıra taşır
+            assert!(
+                text.contains(&format!("[x] paket{cursor}")),
+                "imleç görünür olmalı:\n{text}"
+            );
+            // sayaç üstte, komut önizlemesi altta sabit: kaydırmadan etkilenmez
+            assert!(body[0].contains("12"), "sayaç sabit kalmalı:\n{text}");
+            assert!(
+                body[body.len() - 1].contains("pacman -Rns paket0"),
+                "komut önizlemesi sabit kalmalı:\n{text}"
+            );
+            for row in &rows {
+                assert!(row.chars().count() <= 64, "satır taşmış: {row:?}");
+            }
+        }
+
+        // aşırı küçük uçbirim: panik yok, komut yine son satırda
+        let tiny_plan: Vec<sources::Removal> = (0..12)
+            .map(|i| target(&format!("p{i}"), None, &[]))
+            .collect();
+        let rows = render_at(30, 7, 11, tiny_plan);
+        let body = body(&rows);
+        assert!(
+            body.last().unwrap().contains("pacman"),
+            "komut görünmeli: {body:?}"
+        );
+        for row in &rows {
+            assert!(row.chars().count() <= 30, "satır taşmış: {row:?}");
+        }
     }
 }

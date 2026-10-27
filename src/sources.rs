@@ -101,7 +101,9 @@ pub fn install_command(src: Source, names: &[String]) -> Command {
 pub fn remove_command(src: Source, names: &[String]) -> Command {
     let names: Vec<&str> = names.iter().map(String::as_str).collect();
     match src {
-        Source::Pacman | Source::Aur => root_command("pacman", &[&["-Rns"], names.as_slice()].concat()),
+        Source::Pacman | Source::Aur => {
+            root_command("pacman", &[&["-Rns"], names.as_slice()].concat())
+        }
         Source::Flatpak => cmd("flatpak", &[&["uninstall"], names.as_slice()].concat()),
     }
 }
@@ -472,7 +474,10 @@ mod tests {
         let pkgs = ["sed".to_string(), "nano".to_string()];
         let c = remove_command(Source::Pacman, &pkgs);
         let args: Vec<std::ffi::OsString> = c.get_args().map(|a| a.to_os_string()).collect();
-        assert_eq!(c.get_program(), std::ffi::OsStr::new(sudo_wrapper().as_str()));
+        assert_eq!(
+            c.get_program(),
+            std::ffi::OsStr::new(sudo_wrapper().as_str())
+        );
         assert_eq!(
             args[args.len() - 4..],
             ["pacman", "-Rns", "sed", "nano"].map(std::ffi::OsString::from)
@@ -500,17 +505,15 @@ mod tests {
         assert!(is_protected("filesystem"));
         assert!(!is_protected("sed"));
         assert_eq!(
-            parse_ref_version("org.gnome.Platform/x86_64/51\t52.4", "org.gnome.Platform").as_deref(),
+            parse_ref_version("org.gnome.Platform/x86_64/51\t52.4", "org.gnome.Platform")
+                .as_deref(),
             Some("52.4")
         );
         assert_eq!(
             parse_ref_version("org.gnome.Platform/x86_64/51\t52.4", "org.kde"),
             None
         );
-        assert_eq!(
-            parse_q_version("sed 4.10-2.1").as_deref(),
-            Some("4.10-2.1")
-        );
+        assert_eq!(parse_q_version("sed 4.10-2.1").as_deref(), Some("4.10-2.1"));
         let users = parse_runtime_users(
             "org.gnome.Maps\torg.gnome.Platform/x86_64/51\n\
              org.gnome.Platform/x86_64/51\torg.gnome.Platform/x86_64/51\n",

@@ -46,7 +46,18 @@ r               yeniden kontrol  R                db tazele (sudo pacman -Sy)
 u / Enter       seçili paketleri güncelle        q / Esc  çık
 i               tek paket kur (sudo pacman -S / yay -S / flatpak install;
                 Enter başlatır, Esc vazgeçer)
+x               kaldırılacak ad/ları yaz (Enter onay penceresini açar)
+X               seçili satırları (seçili yoksa imleçtekini) kaldırmaya hedefle
 ```
+
+Kaldırma onay penceresi: her hedef için kurulu sürüm, `pactree -r` ters
+bağımlıları (Flatpak'ta o runtime'ı kullanan uygulamalar), uyarılar ve
+engelleme gerekçeleri listelenir; `base`, `base-devel`, `filesystem`,
+`pacman`, `mkinitcpio`, `systemd` gibi korunan paketler ile kurulu olmayan
+adlar seçime kapalıdır. Üstte
+sayaç, altta çalıştırılacak komut sabit kalır; `space` seçim, `a` tümünü,
+`y` kaldırma (TUI askıya alınır, `sudo pacman -Rns` / `flatpak uninstall`
+gerçek TTY'de parola/onaylarıyla koşar), `Esc` vazgeçme. Sonuç geçmişe yazılır.
 
 ## Derleme
 
@@ -86,8 +97,9 @@ Notlar:
 - [x] İngilizce arayüz — sistem diline göre otomatik (TR/EN)
 - [x] Paket kurma: `i` → isim girişi (tui-input) → `pacman -S` / `yay -S` /
       `flatpak install` mevcut askıya-alma akışıyla; sonuç geçmişe yazılır
-- [ ] Paket kaldırma: `X` → onay dialoğu (tui-popup) + ters-bağımlılık özeti +
-      `base`/`base-devel` koruması → `pacman -Rns` / `flatpak uninstall`
+- [x] Paket kaldırma: `x` / `X` → onay penceresi (tui-popup) + `pactree -r`
+      ters-bağımlılık özeti + `base`/`base-devel`/`systemd` koruması +
+      kurulu-olmayan engeli → `sudo pacman -Rns` / `flatpak uninstall`
 - [ ] Paket arama ve `/` canlı filtre: `pacman -Ss` / `yay -Ss` çıktıları,
       detay paneli (`pacman -Qi/-Si`, `flatpak info`)
 - [ ] Görsel yenileme: tui-scrollbar ile akıcı kaydırma, kontrol sırasında
