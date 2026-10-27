@@ -20,8 +20,8 @@ listeler, paket paket seçmene olanak tanır ve güncellemeleri doğrudan uygula
 j / k / ↑ / ↓   hareket          PageUp/PageDown  10 atla
 space           seçim            a                sekmede tümünü seç
 1 / 2 / 3       sekme            Tab / Ok tuşları sekme değiştir
-r               yeniden kontrol  u / Enter        seçili paketleri güncelle
-q / Esc         çık
+r               yeniden kontrol  R                db tazele (sudo pacman -Sy)
+u / Enter       seçili paketleri güncelle        q / Esc  çık
 ```
 
 ## Derleme
@@ -42,16 +42,20 @@ Kurulum: `sudo install -Dm755 target/release/updateo /usr/local/bin/updateo`
 | Flatpak | `flatpak remote-ls --updates`    | `flatpak update <refler>` |
 
 Notlar:
-- Repo listesi önbellekteki veritabanlarına bakar; en taze sonuç için kontrol
-  sırasında `sudo pacman -Sy` veya dağıtımın mirror güncelleyicisini kullanın.
+- Repo listesi önbellekteki veritabanlarına bakar; en taze sonuç için `R` ile
+  `sudo pacman -Sy` yapıp yeniden kontrol edebilirsiniz (dağıtımın mirror
+  güncelleyicisi de kullanılabilir).
+- Kök yetkisi gereken komutlar varsayılan olarak `sudo` ile koşar;
+  `UPDATEO_SUDO=doas updateo` ile değiştirilebilir (`UPDATEO_SUDO="doas -n"`
+  gibi önek argümanlar da desteklenir).
 - AUR sorgusu ağ ister (yay, AUR RPC API'sine bakar).
 - Flatpak uygulamaları sistem kuruluma göre polkit/parola sorabilir.
 
 ## Yol haritası
 
-- [ ] `r` sırasında db tazeleme seçeneği (`sudo pacman -Sy`)
+- [x] `r` sırasında db tazeleme seçeneği (`sudo pacman -Sy`) — `R` tuşu
 - [ ] Güncelleme geçmişi (log) sekmesi
-- [ ]flatpak çalışma saati/durum ayrımı (watch)
+- [ ] flatpak çalışma saati/durum ayrımı (watch)
 - [ ] systemd timer ile arka plan bildirimi
 
 ## Lisans

@@ -42,6 +42,22 @@ pub struct Update {
 
 pub type CheckResult = Result<Vec<Update>, String>;
 
+/// Yönetici (root) yetkisi gereken komutu kur: varsayılan sarmalayıcı `sudo`;
+/// `UPDATEO_SUDO="doas"` gibi bir değerle değiştirilebilir (boşlukla ayrılan
+/// ilk parça program, kalanı önek argüman olur — ör. `UPDATEO_SUDO="doas -n"`).
+pub fn root_command(program: &str, args: &[&str]) -> Command {
+    let wrapper: Vec<String> = std::env::var("UPDATEO_SUDO")
+        .unwrap_or_else(|_| "sudo".into())
+        .split_whitespace()
+        .map(String::from)
+        .collect();
+    let mut c = Command::new(wrapper.first().map(String::as_str).unwrap_or("sudo"));
+    c.args(&wrapper[1..]);
+    c.arg(program);
+    c.args(args);
+    c
+}
+
 /// Komutu çalıştır, stdout döndür; başarısızlıkta stderr'i hata mesajı yap.
 fn capture(cmd: &mut Command) -> Result<String, String> {
     let out = cmd

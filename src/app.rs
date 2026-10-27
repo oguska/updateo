@@ -52,9 +52,15 @@ impl App {
 
     /// Üç kaynağı da paralel thread'lerde kontrol et; sonuçlar kanaldan gelir.
     pub fn start_refresh(&mut self) {
-        self.checking = Source::ALL.len();
         self.status = "Güncellemeler kontrol ediliyor…".into();
         self.status_err = false;
+        self.spawn_checks();
+    }
+
+    /// Thread'leri başlat; durumu (mesajı) çağıranın yönetmesine bırak —
+    /// uygulanan/senkron edilen işlemin mesajı kontrol bitene kadar görünür kalır.
+    fn spawn_checks(&mut self) {
+        self.checking = Source::ALL.len();
         for src in Source::ALL {
             let tx = self.tx.clone();
             thread::spawn(move || {
@@ -185,6 +191,32 @@ impl App {
         self.offset = 0;
     }
 
+    /// Yerel paket veritabanını `sudo pacman -Sy` ile tazele, sonra yeniden
+    /// kontrol et. Repo listesi önbellekteki db'ye baktığı için taze db olmadan
+    /// gözükmeyen güncellemeler böylece görünür olur.
+    fn sync_db(&mut self) {
+        let wrapper = std::env::var("UPDATEO_SUDO").unwrap_or_else(|_| "sudo".into());
+        self.status = format!("Veritabanı tazeleniyor ({wrapper} pacman -Sy)…");
+        self.status_err = false;
+        let mut cmd = sources::root_command("pacman", &["-Sy"]);
+        match runner::run_suspended(&mut cmd) {
+            Ok(st) if st.success() => {
+                self.status = "Veritabanı tazelendi, yeniden kontrol ediliyor…".into();
+            }
+            Ok(st) => {
+                self.status = format!("Veritabanı tazelenemedi ({st})");
+                self.status_err = true;
+                return;
+            }
+            Err(e) => {
+                self.status = format!("Veritabanı tazeleme başlatılamadı: {e}");
+                self.status_err = true;
+                return;
+            }
+        }
+        self.spawn_checks();
+    }
+
     /// Seçili paketleri kaynak bazında uygula. TUI askıya alınır, çocuk süreç
     /// gerçek TTY'yi kullanır (sudo parolası, pacman/yay onayları dahil).
     fn apply(&mut self) {
@@ -210,11 +242,7 @@ impl App {
                 continue;
             }
             let mut cmd = match src {
-                Source::Pacman => {
-                    let mut c = Command::new("sudo");
-                    c.args(["pacman", "-Syu"]);
-                    c
-                }
+                Source::Pacman => sources::root_command("pacman", &["-Syu"]),
                 Source::Aur => {
                     let mut c = Command::new("yay");
                     c.arg("-S");
@@ -244,7 +272,7 @@ impl App {
         if !self.status_err {
             self.status = "Güncellemeler uygulandı, yeniden kontrol ediliyor…".into();
         }
-        self.start_refresh();
+        self.spawn_checks();
     }
 
     fn on_key(&mut self, k: KeyEvent) -> std::io::Result<()> {
@@ -263,6 +291,7 @@ impl App {
             KeyCode::Char(' ') => self.toggle_current(),
             KeyCode::Char('a') => self.toggle_all_tab(),
             KeyCode::Char('r') => self.start_refresh(),
+            KeyCode::Char('R') => self.sync_db(),
             KeyCode::Char('u') | KeyCode::Enter => self.apply(),
             KeyCode::Char('1') => self.switch_tab(0),
             KeyCode::Char('2') => self.switch_tab(1),
@@ -319,7 +348,7 @@ impl App {
             spans.push(Span::styled(text, style));
         }
         spans.push(Span::styled(
-            "   j/k hareket · space seçim · a tümünü · r yenile · u güncelle · q çık",
+            "   j/k hareket · space seçim · a tümünü · r yenile · R db tazele · u güncelle · q çık",
             Style::new().fg(Color::DarkGray),
         ));
         f.render_widget(Paragraph::new(Line::from(spans)), tabs_area);
