@@ -7,6 +7,8 @@ listeler, paket paket seçmene olanak tanır ve güncellemeleri doğrudan uygula
 ## Özellikler
 
 - Üç sekme: `pacman`, `AUR`, `Flatpak` — her birinde seçili/toplam rozeti
+- Dördüncü sekme `geçmiş`: uygulanan güncellemelerin zaman damgalı kaydı
+  (`~/.local/share/updateo/history.jsonl`)
 - Paket paket seçim (`space`), sekmede tümünü seç/kaldır (`a`)
 - `u` ile uygulama: TUI geçici olarak askıya alınır; `sudo pacman -Syu`,
   `yay -S` ve `flatpak update` gerçek TTY'de, tüm etkileşimli onaylarıyla
@@ -19,7 +21,7 @@ listeler, paket paket seçmene olanak tanır ve güncellemeleri doğrudan uygula
 ```
 j / k / ↑ / ↓   hareket          PageUp/PageDown  10 atla
 space           seçim            a                sekmede tümünü seç
-1 / 2 / 3       sekme            Tab / Ok tuşları sekme değiştir
+1 / 2 / 3 / 4   sekmeler (4 = geçmiş)   Tab / Ok tuşları  sekme değiştir
 r               yeniden kontrol  R                db tazele (sudo pacman -Sy)
 u / Enter       seçili paketleri güncelle        q / Esc  çık
 ```
@@ -54,7 +56,7 @@ Notlar:
 ## Yol haritası
 
 - [x] `r` sırasında db tazeleme seçeneği (`sudo pacman -Sy`) — `R` tuşu
-- [ ] Güncelleme geçmişi (log) sekmesi
+- [x] Güncelleme geçmişi (log) sekmesi — `4` tuşu, JSONL kaydı
 - [ ] flatpak çalışma saati/durum ayrımı (watch)
 - [ ] systemd timer ile arka plan bildirimi
 

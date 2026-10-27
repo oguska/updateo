@@ -1,10 +1,11 @@
 //! Uygulama durumu, tuş atamaları ve çizim.
 
+use crate::history::{self, Entry};
 use crate::runner;
 use crate::sources::{self, CheckResult, Source, Update};
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::Frame;
-use ratatui::layout::{Constraint, Layout};
+use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Paragraph};
@@ -13,6 +14,9 @@ use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
 use std::time::{Duration, Instant};
 
+/// Sekme sayısı: üç kaynak + geçmiş (sonuncusu).
+const TAB_COUNT: usize = Source::ALL.len() + 1;
+
 pub struct CheckMsg {
     pub source: Source,
     pub result: CheckResult,
@@ -20,6 +24,7 @@ pub struct CheckMsg {
 
 pub struct App {
     updates: Vec<Update>, // kaynak + ada göre sıralı
+    history: Vec<Entry>,  // güncelleme günlüğü, en yeni üstte
     tab: usize,           // Source::ALL indeksi
     sel: usize,           // aktif sekmedeki imleç (sekme-içi indeks)
     offset: usize,        // kaydırma penceresi başlangıcı
@@ -37,6 +42,7 @@ impl App {
         let (tx, rx) = mpsc::channel();
         Self {
             updates: Vec::new(),
+            history: Vec::new(),
             tab: 0,
             sel: 0,
             offset: 0,
@@ -112,8 +118,11 @@ impl App {
         }
     }
 
-    /// Aktif sekmedeki güncellemelerin global indeksleri.
+    /// Aktif sekmedeki güncellemelerin global indeksleri (geçmişte boş).
     fn tab_items(&self) -> Vec<usize> {
+        if self.is_hist_tab() {
+            return Vec::new();
+        }
         let src = Source::ALL[self.tab];
         self.updates
             .iter()
@@ -123,12 +132,31 @@ impl App {
             .collect()
     }
 
+    fn is_hist_tab(&self) -> bool {
+        self.tab == Source::ALL.len()
+    }
+
+    /// Aktif sekmedeki satır sayısı (geçmiş: kayıt sayısı).
+    fn tab_len(&self) -> usize {
+        if self.is_hist_tab() {
+            self.history.len()
+        } else {
+            self.tab_items().len()
+        }
+    }
+
     fn count(&self, tab: usize) -> usize {
+        if tab >= Source::ALL.len() {
+            return 0;
+        }
         let src = Source::ALL[tab];
         self.updates.iter().filter(|u| u.source == src).count()
     }
 
     fn selected_count(&self, tab: usize) -> usize {
+        if tab >= Source::ALL.len() {
+            return 0;
+        }
         let src = Source::ALL[tab];
         self.updates
             .iter()
@@ -137,7 +165,7 @@ impl App {
     }
 
     fn clamp(&mut self) {
-        let n = self.tab_items().len();
+        let n = self.tab_len();
         if n == 0 {
             self.sel = 0;
             self.offset = 0;
@@ -147,7 +175,7 @@ impl App {
     }
 
     fn move_sel(&mut self, delta: isize, page: usize) {
-        let n = self.tab_items().len();
+        let n = self.tab_len();
         if n == 0 {
             return;
         }
@@ -165,6 +193,9 @@ impl App {
     }
 
     fn toggle_current(&mut self) {
+        if self.is_hist_tab() {
+            return;
+        }
         let items = self.tab_items();
         if let Some(&gi) = items.get(self.sel) {
             self.updates[gi].selected = !self.updates[gi].selected;
@@ -173,6 +204,9 @@ impl App {
 
     /// Sekmedeki tümünü seç / tümünün seçimini kaldır.
     fn toggle_all_tab(&mut self) {
+        if self.is_hist_tab() {
+            return;
+        }
         let src = Source::ALL[self.tab];
         let all_selected = self
             .updates
@@ -186,9 +220,12 @@ impl App {
     }
 
     fn switch_tab(&mut self, tab: usize) {
-        self.tab = tab % Source::ALL.len();
+        self.tab = tab % TAB_COUNT;
         self.sel = 0;
         self.offset = 0;
+        if self.is_hist_tab() {
+            self.history = history::load();
+        }
     }
 
     /// Yerel paket veritabanını `sudo pacman -Sy` ile tazele, sonra yeniden
@@ -256,13 +293,15 @@ impl App {
             };
             cmd.args(&names);
             match runner::run_suspended(&mut cmd) {
-                Ok(st) if st.success() => {}
+                Ok(st) if st.success() => history::record(src.label(), "ok", &names),
                 Ok(st) => {
+                    history::record(src.label(), &format!("başarısız ({st})"), &names);
                     self.status = format!("{} güncellemesi tamamlanmadı ({st})", src.label());
                     self.status_err = true;
                     break;
                 }
                 Err(e) => {
+                    history::record(src.label(), &format!("başlatılamadı: {e}"), &names);
                     self.status = format!("{} başlatılamadı: {e}", src.label());
                     self.status_err = true;
                     break;
@@ -272,6 +311,7 @@ impl App {
         if !self.status_err {
             self.status = "Güncellemeler uygulandı, yeniden kontrol ediliyor…".into();
         }
+        self.history = history::load();
         self.spawn_checks();
     }
 
@@ -296,9 +336,10 @@ impl App {
             KeyCode::Char('1') => self.switch_tab(0),
             KeyCode::Char('2') => self.switch_tab(1),
             KeyCode::Char('3') => self.switch_tab(2),
+            KeyCode::Char('4') => self.switch_tab(3),
             KeyCode::Tab => self.switch_tab(self.tab + 1),
-            KeyCode::BackTab => self.switch_tab(self.tab + Source::ALL.len() - 1),
-            KeyCode::Left => self.switch_tab(self.tab + Source::ALL.len() - 1),
+            KeyCode::BackTab => self.switch_tab(self.tab + TAB_COUNT - 1),
+            KeyCode::Left => self.switch_tab(self.tab + TAB_COUNT - 1),
             KeyCode::Right => self.switch_tab(self.tab + 1),
             _ => {}
         }
@@ -319,6 +360,67 @@ impl App {
 
     // ------------------------------- çizim -------------------------------
 
+    /// Geçmiş sekmesi: uygulanan güncellemeler, en yeni üstte.
+    fn draw_history(&mut self, f: &mut Frame, area: Rect, block: Block) {
+        if self.history.is_empty() {
+            f.render_widget(
+                Paragraph::new("henüz güncelleme uygulanmadı — 'u' sonrası kayıtlar burada")
+                    .block(block)
+                    .style(Style::new().fg(Color::DarkGray)),
+                area,
+            );
+            return;
+        }
+        let n = self.history.len();
+        let inner_h = area.height.saturating_sub(2) as usize;
+        if self.sel < self.offset {
+            self.offset = self.sel;
+        }
+        if inner_h > 0 && self.sel >= self.offset + inner_h {
+            self.offset = self.sel - inner_h + 1;
+        }
+        let pkgs_w = (area.width as usize).saturating_sub(52).max(12);
+        let mut lines: Vec<Line> = Vec::new();
+        for (idx, e) in self.history.iter().enumerate() {
+            if idx < self.offset || idx >= self.offset + inner_h {
+                continue;
+            }
+            let cursor = if idx == self.sel { ">" } else { " " };
+            let row = format!(
+                "{cursor} {}  {:<7} {:<24} {}",
+                e.time,
+                e.source,
+                truncate(&e.result, 22),
+                truncate(&e.pkgs.join(" "), pkgs_w),
+            );
+            let mut style = Style::new().fg(if e.result == "ok" {
+                Color::Green
+            } else {
+                Color::Red
+            });
+            if idx == self.sel {
+                style = style.bg(Color::DarkGray).add_modifier(Modifier::BOLD);
+            }
+            lines.push(Line::from(Span::styled(row, style)));
+        }
+        if self.offset > 0
+            && let Some(first) = lines.first_mut()
+        {
+            first.spans.push(Span::styled(
+                format!("  ↑{}", self.offset),
+                Style::new().fg(Color::DarkGray),
+            ));
+        }
+        let hidden = n.saturating_sub(self.offset + inner_h);
+        if hidden > 0 && lines.len() < inner_h {
+            lines.push(Line::from(Span::styled(
+                format!("  ↓{hidden}", hidden = hidden),
+                Style::new().fg(Color::DarkGray),
+            )));
+        }
+        f.render_widget(Paragraph::new(lines).block(block), area);
+    }
+
     pub fn draw(&mut self, f: &mut Frame) {
         let area = f.area();
         let [tabs_area, list_area, status_area] = Layout::vertical([
@@ -330,13 +432,17 @@ impl App {
 
         // Sekme çubuğu: "pacman (seçili/toplam)" rozetleri + kısayol ipucu
         let mut spans = Vec::new();
-        for i in 0..Source::ALL.len() {
-            let text = format!(
-                " {} ({}/{}) ",
-                Source::ALL[i].label(),
-                self.selected_count(i),
-                self.count(i)
-            );
+        for i in 0..TAB_COUNT {
+            let text = if i < Source::ALL.len() {
+                format!(
+                    " {} ({}/{}) ",
+                    Source::ALL[i].label(),
+                    self.selected_count(i),
+                    self.count(i)
+                )
+            } else {
+                " geçmiş ".to_string()
+            };
             let style = if i == self.tab {
                 Style::new()
                     .fg(Color::Black)
@@ -356,7 +462,9 @@ impl App {
         // Liste
         let block = Block::bordered().title(" updateo · Arch güncelleyici ");
         let items = self.tab_items();
-        if items.is_empty() {
+        if self.is_hist_tab() {
+            self.draw_history(f, list_area, block);
+        } else if items.is_empty() {
             let msg = if self.checking > 0 {
                 "kontrol ediliyor…"
             } else {
@@ -411,13 +519,13 @@ impl App {
                 lines.push(Line::from(Span::styled(row, style)));
             }
             // kaydırma göstergeleri
-            if self.offset > 0 {
-                if let Some(first) = lines.first_mut() {
-                    first.spans.push(Span::styled(
-                        format!("  ↑{}", self.offset),
-                        Style::new().fg(Color::DarkGray),
-                    ));
-                }
+            if self.offset > 0
+                && let Some(first) = lines.first_mut()
+            {
+                first.spans.push(Span::styled(
+                    format!("  ↑{}", self.offset),
+                    Style::new().fg(Color::DarkGray),
+                ));
             }
             let hidden = items.len().saturating_sub(self.offset + inner_h);
             if hidden > 0 && lines.len() < inner_h {

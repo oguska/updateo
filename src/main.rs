@@ -2,6 +2,7 @@
 //! güncelleyicisi, ratatui tabanlı modern TUI.
 
 mod app;
+mod history;
 mod runner;
 mod sources;
 
