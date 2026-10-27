@@ -33,6 +33,8 @@ listeler, paket paket seçmene olanak tanır ve güncellemeleri doğrudan uygula
   yalnız sudo parolası gerekebilir; sonuç geçmişe yazılır
 - Kontroller paralel thread'lerde; ağ hatası tek kaynağı düşürür, arayüzü kilitlemez
 - Tek statik binary, runtime bağımlılığı yok (SQLite gömülü)
+- Bildirim `check --notify` ile gelir: güncelleme varsa masaüstü bildirimi
+  açılır, **Şimdi güncelle** düğmesi updateo TUI'yi uçbirimde başlatır
 - Arayüz dili sistem dilinden seçilir: `LC_ALL` → `LC_MESSAGES` → `LANG`;
   `tr` öneki Türkçe, diğer her şey İngilizce
 
@@ -40,13 +42,17 @@ listeler, paket paket seçmene olanak tanır ve güncellemeleri doğrudan uygula
 
 ```
 updateo                        TUI
-updateo check [--notify]       TUI'siz kontrol; --notify varsa masaüstü bildirimi
+updateo check [--notify]       TUI'siz kontrol; --notify eylemli masaüstü bildirimi
 updateo install-timer          systemd-user günlük zamanlayıcısı (09:30, Persistent)
 updateo uninstall-timer        zamanlayıcıyı kaldır
 ```
 
 Zamanlayıcı kurulunca günlük `check --notify` çalışır; güncelleme varsa
-`notify-send` ile bildirim gider (yoksa systemd journal'a düşer).
+`notify-send` ile bildirim gider (yoksa systemd journal'a düşer). Bildirimdeki
+**Şimdi güncelle** düğmesi updateo TUI'yi masaüstü uçbiriminde açar; uçbirim
+otomatik bulunamazsa `UPDATEO_TERMINAL=/yol/uçbirim` ile belirtilebilir.
+Mevcut bir zamanlayıcıyı güncellemek için `updateo install-timer` yeniden
+çalıştırılmalıdır (birim `KillMode=process` ile açılan TUI'yi korur).
 
 ## Tuşlar
 
@@ -114,6 +120,9 @@ Notlar:
   için gizlenen seçili paketler de plana girer.
 - `i` ile kurulumda pacman/yay `--noconfirm`, flatpak `-y` kullanır: kurulum
   onayı sorulmaz, yalnız sudo parolası gerekebilir.
+- Bildirim eylemi 45 saniye görünür kalır; tıklanınca TUI açılır (sudo/pacman
+  onayları yine gerçek uçbirimde sorulur). Masaüstü bildirim servisi eylemleri
+  desteklemiyorsa bildirim yalnız bilgi olarak kalır.
 - Flatpak uygulamaları sistem kuruluma göre polkit/parola sorabilir.
 
 ## Yol haritası
@@ -122,7 +131,8 @@ Notlar:
 - [x] Güncelleme geçmişi (log) sekmesi — `4` tuşu, JSONL kaydı
 - [x] flatpak runtime/uzantı ayrımı — `(runtime)` etiketi, sıralamada sonra,
   kurulu sürüm gösterimi (`flatpak list` eşleşmesi ref'in ilk bölümüyle)
-- [x] systemd timer ile arka plan bildirimi — `updateo install-timer` + `check --notify`
+- [x] systemd timer ile arka plan bildirimi — `updateo install-timer` + `check --notify`;
+      bildirimdeki **Şimdi güncelle** düğmesi TUI'yi uçbirimde açar
 - [x] Geçmişin JSONL yerine SQLite'a taşınması (`history.db`, otomatik içe aktarma)
 - [x] İngilizce arayüz — sistem diline göre otomatik (TR/EN)
 - [x] Paket kurma: `i` → isim girişi (tui-input) → `pacman -S --noconfirm` /

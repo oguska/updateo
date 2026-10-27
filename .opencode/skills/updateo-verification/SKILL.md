@@ -29,7 +29,8 @@ sh .e2e/probes.sh
   changes or the probes test stale code.
 - `probes.sh` needs `python3` and finishes with `ALL PROBES OK` on success.
 - The probes are deterministic: fake package managers from `.e2e/tools` plus
-  `.e2e/fake_sudo`, and a fake database at `.e2e/fake_db`.
+  `.e2e/fake_sudo`, `.e2e/fake_terminal`, and a fake database at
+  `.e2e/fake_db`.
 - Do not run the probes against the live system. `screen_dump.py` overrides
   `PATH`, `UPDATEO_SUDO`, `UPDATEO_FAKE_DB`, `FAKE_SUDO_LOG`, and
   `XDG_DATA_HOME`; the fake sudo only appends to `.e2e/sudo.log`.
@@ -70,6 +71,10 @@ rustfmt --edition 2024 src/<file>.rs   # only when the diff is yours
 13. `u` + `y` confirms and reaches the wrapper with `pacman -Syu nano sed`.
 14. `d` on a wide terminal opens the details sidebar with `pacman -Si` output.
 15. Search arrow keys keep the popup open; Down + Enter opens the second hit.
+16. `check --notify` sends an actionable notification (`--action=update=...`)
+    and the selected action launches the TUI in a fake terminal. This probe
+    uses `.e2e/tools/notify-send` and `.e2e/fake_terminal` logs rather than a
+    PTY screen dump.
 
 The harness is `.e2e/screen_dump.py`:
 

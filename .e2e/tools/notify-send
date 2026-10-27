@@ -1,0 +1,5 @@
+#!/bin/sh
+# Sahte notify-send: argümanları loglar ve kullanıcı "update" eylemini seçmiş
+# gibi davranır; gerçek bildirim göstermez.
+printf '%s\n' "$*" >> "${NOTIFY_LOG:?}"
+printf 'update\n'

@@ -139,6 +139,26 @@ run "search arrows keep the popup open" \
     --width 100 --height 30 \
     --expect "details · extra/nano" --expect "Name            : nano"
 
+# 16) bildirim eylemi: "Şimdi güncelle" seçilince TUI uçbirimde açılır
+notify_log="$PWD/.e2e/logs/notify.log"
+term_log="$PWD/.e2e/logs/terminal.log"
+: >"$notify_log"
+: >"$term_log"
+run "notification action opens the TUI" \
+    env LC_ALL=en_US.UTF-8 PATH="$PWD/.e2e/tools:$PATH" \
+    UPDATEO_FAKE_DB="$PWD/.e2e/fake_db" \
+    NOTIFY_LOG="$notify_log" TERMINAL_LOG="$term_log" \
+    UPDATEO_TERMINAL="$PWD/.e2e/fake_terminal" \
+    target/release/updateo check --notify
+if ! grep -q -- "--action=update=Update now" "$notify_log"; then
+    echo "    FAIL: bildirimde eylem düğmesi yok: $(cat "$notify_log")"
+    fail=$((fail + 1))
+fi
+if ! grep -q "updateo" "$term_log"; then
+    echo "    FAIL: eylem TUI'yi açmadı: $(cat "$term_log")"
+    fail=$((fail + 1))
+fi
+
 echo "----"
 if [ "$fail" -eq 0 ]; then
     echo "ALL PROBES OK"

@@ -21,7 +21,7 @@ serde/serde_json, chrono.
 
 | Path | Responsibility |
 |------|----------------|
-| `src/main.rs` | CLI dispatch (`check [--notify]`, `install-timer`, `uninstall-timer`, default TUI), terminal setup, panic hook. |
+| `src/main.rs` | CLI dispatch (`check [--notify]`, `install-timer`, `uninstall-timer`, default TUI), actionable notification + terminal launch, terminal setup, panic hook. |
 | `src/app.rs` | `App` state, tabs, async checks/search, key handling, all rendering, filter/search/details/apply/install/remove popups, layout/truncation helpers. |
 | `src/sources.rs` | `Source`/`Update`/`SearchHit`, check/search/detail commands and parsers, command builders, `UPDATEO_SUDO`, name validation, removal plans, installed versions, previews. |
 | `src/history.rs` | SQLite history at `$XDG_DATA_HOME/updateo/history.db`; one-time `history.jsonl` import; `record`, `load`, `is_success`. |
@@ -51,6 +51,13 @@ serde/serde_json, chrono.
 6. `run_suspended` is used for every command that may need sudo/polkit or an
    interactive package-manager flow. The TUI is restored afterward and history
    is recorded before `spawn_checks`.
+7. `cmd_check` prints per-source counts. With `--notify` and updates present it
+   runs `notify-send` with a single `update` action (45 s timeout, `-w`).
+   Selecting the action returns `update` on stdout; `launch_tui` then opens the
+   current executable in `$UPDATEO_TERMINAL` or the first available terminal
+   (`xdg-terminal-exec`, `konsole`, `alacritty`, `kitty`, `foot`, `wezterm`,
+   `gnome-terminal`, `xfce4-terminal`, `xterm`). `terminal_args` owns the
+   per-terminal `-e`/`--`/`start --` differences.
 
 ## Command builders (keep them in `sources.rs`)
 

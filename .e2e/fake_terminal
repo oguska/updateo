@@ -1,0 +1,4 @@
+#!/bin/sh
+# Sahte uçbirim: gerçek TUI'yi açmadan yalnız çağrıyı loglar.
+printf '%s\n' "$*" >> "${TERMINAL_LOG:?}"
+exit 0

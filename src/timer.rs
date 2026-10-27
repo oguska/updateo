@@ -1,5 +1,6 @@
 //! systemd-user zamanlayıcısı: `updateo install-timer` günlük `check --notify`
 //! birimi kurar; bildirim `notify-send` ile gider (yoksa günlüğe düşer).
+//! Bildirimdeki eylem TUI'yi masaüstü uçbiriminde açar.
 
 use crate::i18n::tr;
 use std::io;
@@ -31,6 +32,7 @@ fn service_text(exe: &str) -> String {
          Description=updateo package update check\n\
          [Service]\n\
          Type=oneshot\n\
+         KillMode=process\n\
          ExecStart=\"{exe}\" check --notify\n"
     )
 }
@@ -138,6 +140,8 @@ mod tests {
         let svc = service_text("/usr/bin/updateo");
         assert!(svc.contains("ExecStart=\"/usr/bin/updateo\" check --notify"));
         assert!(svc.contains("Type=oneshot"));
+        // Bildirimden açılan uçbirim, oneshot servis bitince öldürülmemeli.
+        assert!(svc.contains("KillMode=process"));
         let t = timer_text();
         assert!(t.contains("OnCalendar=*-*-* 09:30:00") && t.contains("Persistent=true"));
         assert!(t.contains("WantedBy=timers.target"));
