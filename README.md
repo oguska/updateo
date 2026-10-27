@@ -10,13 +10,28 @@ listeler, paket paket seçmene olanak tanır ve güncellemeleri doğrudan uygula
 - Flatpak'ta uygulamalar ile runtime/uzantılar ayrılır: runtime'lar sonra
   gelir, `(runtime)` etiketi ve kurulu sürümle (`eski -> yeni`) gösterilir
 - Dördüncü sekme `geçmiş`: uygulanan güncellemelerin zaman damgalı kaydı
-  (`~/.local/share/updateo/history.jsonl`)
+  (`~/.local/share/updateo/history.db` — SQLite; eski `history.jsonl` ilk
+  açılışta bir kez içe aktarılır)
 - Paket paket seçim (`space`), sekmede tümünü seç/kaldır (`a`)
 - `u` ile uygulama: TUI geçici olarak askıya alınır; `sudo pacman -Syu`,
   `yay -S` ve `flatpak update` gerçek TTY'de, tüm etkileşimli onaylarıyla
   (parola sorusu, pacman çatışma onayları, yay derleme akışı) çalışır
 - Kontroller paralel thread'lerde; ağ hatası tek kaynağı düşürür, arayüzü kilitlemez
-- Tek statik binary, runtime bağımlılığı yok
+- Tek statik binary, runtime bağımlılığı yok (SQLite gömülü)
+- Arayüz dili sistem dilinden seçilir: `LC_ALL` → `LC_MESSAGES` → `LANG`;
+  `tr` öneki Türkçe, diğer her şey İngilizce
+
+## Komutlar
+
+```
+updateo                        TUI
+updateo check [--notify]       TUI'siz kontrol; --notify varsa masaüstü bildirimi
+updateo install-timer          systemd-user günlük zamanlayıcısı (09:30, Persistent)
+updateo uninstall-timer        zamanlayıcıyı kaldır
+```
+
+Zamanlayıcı kurulunca günlük `check --notify` çalışır; güncelleme varsa
+`notify-send` ile bildirim gider (yoksa systemd journal'a düşer).
 
 ## Tuşlar
 
@@ -61,7 +76,9 @@ Notlar:
 - [x] Güncelleme geçmişi (log) sekmesi — `4` tuşu, JSONL kaydı
 - [x] flatpak runtime/uzantı ayrımı — `(runtime)` etiketi, sıralamada sonra,
   kurulu sürüm gösterimi (`flatpak list` eşleşmesi ref'in ilk bölümüyle)
-- [ ] systemd timer ile arka plan bildirimi
+- [x] systemd timer ile arka plan bildirimi — `updateo install-timer` + `check --notify`
+- [x] Geçmişin JSONL yerine SQLite'a taşınması (`history.db`, otomatik içe aktarma)
+- [x] İngilizce arayüz — sistem diline göre otomatik (TR/EN)
 
 ## Lisans
 

@@ -43,6 +43,14 @@ pub struct Update {
     pub selected: bool,
 }
 
+pub fn check(src: Source) -> CheckResult {
+    match src {
+        Source::Pacman => check_pacman(),
+        Source::Aur => check_aur(),
+        Source::Flatpak => check_flatpak(),
+    }
+}
+
 pub type CheckResult = Result<Vec<Update>, String>;
 
 /// Yönetici (root) yetkisi gereken komutu kur: varsayılan sarmalayıcı `sudo`;
@@ -63,9 +71,12 @@ pub fn root_command(program: &str, args: &[&str]) -> Command {
 
 /// Komutu çalıştır, stdout döndür; başarısızlıkta stderr'i hata mesajı yap.
 fn capture(mut cmd: Command) -> Result<String, String> {
-    let out = cmd
-        .output()
-        .map_err(|e| format!("'{:?}' çalıştırılamadı: {e}", cmd.get_program()))?;
+    let out = cmd.output().map_err(|e| {
+        crate::i18n::tr(
+            &format!("could not run '{:?}': {e}", cmd.get_program()),
+            &format!("'{:?}' çalıştırılamadı: {e}", cmd.get_program()),
+        )
+    })?;
     if !out.status.success() {
         let err = String::from_utf8_lossy(&out.stderr);
         let err = err.trim();

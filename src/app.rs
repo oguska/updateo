@@ -1,6 +1,7 @@
 //! Uygulama durumu, tuş atamaları ve çizim.
 
 use crate::history::{self, Entry};
+use crate::i18n::tr;
 use crate::runner;
 use crate::sources::{self, CheckResult, Source, Update};
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
@@ -47,7 +48,7 @@ impl App {
             sel: 0,
             offset: 0,
             checking: 0,
-            status: "Güncellemeler kontrol ediliyor…".into(),
+            status: tr("Checking for updates…", "Güncellemeler kontrol ediliyor…"),
             status_err: false,
             quit: false,
             rx,
@@ -58,7 +59,7 @@ impl App {
 
     /// Üç kaynağı da paralel thread'lerde kontrol et; sonuçlar kanaldan gelir.
     pub fn start_refresh(&mut self) {
-        self.status = "Güncellemeler kontrol ediliyor…".into();
+        self.status = tr("Checking for updates…", "Güncellemeler kontrol ediliyor…");
         self.status_err = false;
         self.spawn_checks();
     }
@@ -95,7 +96,10 @@ impl App {
                     sources::sort_updates(&mut self.updates);
                 }
                 Err(e) => {
-                    self.status = format!("{} kontrolü başarısız: {e}", msg.source.label());
+                    self.status = tr(
+                        &format!("{} check failed: {e}", msg.source.label()),
+                        &format!("{} kontrolü başarısız: {e}", msg.source.label()),
+                    );
                     self.status_err = true;
                 }
             }
@@ -105,8 +109,14 @@ impl App {
             if !self.status_err {
                 let total = self.updates.len();
                 self.status = match total {
-                    0 => "Güncelleme yok — sistem güncel.".into(),
-                    n => format!("{n} güncellenebilir paket."),
+                    0 => tr(
+                        "No updates — system is up to date.",
+                        "Güncelleme yok — sistem güncel.",
+                    ),
+                    n => tr(
+                        &format!("{n} updateable package(s)."),
+                        &format!("{n} güncellenebilir paket."),
+                    ),
                 };
             }
             self.clamp();
@@ -228,20 +238,32 @@ impl App {
     /// gözükmeyen güncellemeler böylece görünür olur.
     fn sync_db(&mut self) {
         let wrapper = std::env::var("UPDATEO_SUDO").unwrap_or_else(|_| "sudo".into());
-        self.status = format!("Veritabanı tazeleniyor ({wrapper} pacman -Sy)…");
+        self.status = tr(
+            &format!("Refreshing database ({wrapper} pacman -Sy)…"),
+            &format!("Veritabanı tazeleniyor ({wrapper} pacman -Sy)…"),
+        );
         self.status_err = false;
         let mut cmd = sources::root_command("pacman", &["-Sy"]);
         match runner::run_suspended(&mut cmd) {
             Ok(st) if st.success() => {
-                self.status = "Veritabanı tazelendi, yeniden kontrol ediliyor…".into();
+                self.status = tr(
+                    "Database refreshed, rechecking…",
+                    "Veritabanı tazelendi, yeniden kontrol ediliyor…",
+                );
             }
             Ok(st) => {
-                self.status = format!("Veritabanı tazelenemedi ({st})");
+                self.status = tr(
+                    &format!("Database refresh failed ({st})"),
+                    &format!("Veritabanı tazelenemedi ({st})"),
+                );
                 self.status_err = true;
                 return;
             }
             Err(e) => {
-                self.status = format!("Veritabanı tazeleme başlatılamadı: {e}");
+                self.status = tr(
+                    &format!("Cannot start database refresh: {e}"),
+                    &format!("Veritabanı tazeleme başlatılamadı: {e}"),
+                );
                 self.status_err = true;
                 return;
             }
@@ -259,7 +281,10 @@ impl App {
             }
         }
         if !any {
-            self.status = "Seçili paket yok — space ile seç, u ile uygula.".into();
+            self.status = tr(
+                "No package selected — press space to select, u to apply.",
+                "Seçili paket yok — space ile seç, u ile uygula.",
+            );
             self.status_err = false;
             return;
         }
@@ -290,21 +315,30 @@ impl App {
             match runner::run_suspended(&mut cmd) {
                 Ok(st) if st.success() => history::record(src.label(), "ok", &names),
                 Ok(st) => {
-                    history::record(src.label(), &format!("başarısız ({st})"), &names);
-                    self.status = format!("{} güncellemesi tamamlanmadı ({st})", src.label());
+                    history::record(src.label(), &format!("failed ({st})"), &names);
+                    self.status = tr(
+                        &format!("{} update did not finish ({st})", src.label()),
+                        &format!("{} güncellemesi tamamlanmadı ({st})", src.label()),
+                    );
                     self.status_err = true;
                     break;
                 }
                 Err(e) => {
-                    history::record(src.label(), &format!("başlatılamadı: {e}"), &names);
-                    self.status = format!("{} başlatılamadı: {e}", src.label());
+                    history::record(src.label(), &format!("could not start: {e}"), &names);
+                    self.status = tr(
+                        &format!("Cannot start {} update: {e}", src.label()),
+                        &format!("{} güncellemesi başlatılamadı: {e}", src.label()),
+                    );
                     self.status_err = true;
                     break;
                 }
             }
         }
         if !self.status_err {
-            self.status = "Güncellemeler uygulandı, yeniden kontrol ediliyor…".into();
+            self.status = tr(
+                "Updates applied, rechecking…",
+                "Güncellemeler uygulandı, yeniden kontrol ediliyor…",
+            );
         }
         self.history = history::load();
         self.spawn_checks();
@@ -359,9 +393,12 @@ impl App {
     fn draw_history(&mut self, f: &mut Frame, area: Rect, block: Block) {
         if self.history.is_empty() {
             f.render_widget(
-                Paragraph::new("henüz güncelleme uygulanmadı — 'u' sonrası kayıtlar burada")
-                    .block(block)
-                    .style(Style::new().fg(Color::DarkGray)),
+                Paragraph::new(tr(
+                    "no updates applied yet — entries appear here after 'u'",
+                    "henüz güncelleme uygulanmadı — 'u' sonrası kayıtlar burada",
+                ))
+                .block(block)
+                .style(Style::new().fg(Color::DarkGray)),
                 area,
             );
             return;
@@ -436,7 +473,7 @@ impl App {
                     self.count(i)
                 )
             } else {
-                " geçmiş ".to_string()
+                tr(" history ", " geçmiş ")
             };
             let style = if i == self.tab {
                 Style::new()
@@ -449,21 +486,30 @@ impl App {
             spans.push(Span::styled(text, style));
         }
         spans.push(Span::styled(
-            "   j/k hareket · space seçim · a tümünü · r yenile · R db tazele · u güncelle · q çık",
+            tr(
+                "   j/k move · space select · a all · r refresh · R refresh db · u apply · q quit",
+                "   j/k hareket · space seçim · a tümünü · r yenile · R db tazele · u güncelle · q çık",
+            ),
             Style::new().fg(Color::DarkGray),
         ));
         f.render_widget(Paragraph::new(Line::from(spans)), tabs_area);
 
         // Liste
-        let block = Block::bordered().title(" updateo · Arch güncelleyici ");
+        let block = Block::bordered().title(tr(
+            " updateo · Arch updater ",
+            " updateo · Arch güncelleyici ",
+        ));
         let items = self.tab_items();
         if self.is_hist_tab() {
             self.draw_history(f, list_area, block);
         } else if items.is_empty() {
             let msg = if self.checking > 0 {
-                "kontrol ediliyor…"
+                tr("checking…", "kontrol ediliyor…")
             } else {
-                "güncellenecek paket yok — 'r' ile yenile"
+                tr(
+                    "no packages to update — press 'r' to refresh",
+                    "güncellenecek paket yok — 'r' ile yenile",
+                )
             };
             f.render_widget(
                 Paragraph::new(msg).style(Style::new().fg(Color::DarkGray)),
@@ -547,9 +593,9 @@ impl App {
         };
         let mut status = self.status.clone();
         if let Some(t) = self.last_check {
-            status.push_str(&format!(
-                "  ·  son kontrol {}sn önce",
-                t.elapsed().as_secs()
+            status.push_str(&tr(
+                &format!("  ·  last check {}s ago", t.elapsed().as_secs()),
+                &format!("  ·  son kontrol {}sn önce", t.elapsed().as_secs()),
             ));
         }
         f.render_widget(
