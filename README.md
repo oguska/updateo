@@ -6,6 +6,7 @@ Arch tabanlı sistemler (Arch, CachyOS, Manjaro…) için tek arayüzden güncel
 yöneticisi: **pacman (repo) + AUR (yay) + Flatpak** güncellemelerini tek TUI'de
 listeler, paket paket seçmene olanak tanır ve güncellemeleri doğrudan uygular.
 
+<img width="1062" height="604" alt="image" src="https://github.com/user-attachments/assets/5780f430-a5d0-4d42-98e4-75578e709082" />
 ## Özellikler
 
 - Üç sekme: `pacman`, `AUR`, `Flatpak` — her birinde seçili/toplam rozeti
