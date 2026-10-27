@@ -1,5 +1,5 @@
 #!/bin/sh
-# Sahte flatpak: sorgular UPDATEO_FAKE_DB'den, uninstall yalnızca loglar.
+# Sahte flatpak: sorgular UPDATEO_FAKE_DB'den, kurulum/kaldırma yalnız loglar.
 db="${UPDATEO_FAKE_DB:?}"
 case "${1:-}" in
   list)
@@ -9,5 +9,21 @@ case "${1:-}" in
       --columns=app,version) grep '^fpinst' "$db" | sed 's/^fpinst\t//' ;;
     esac ;;
   remote-ls) grep '^up flatpak' "$db" | sed 's/^up flatpak\t//' ;;
+  search)
+    q=${2:-}
+    [ -n "$q" ] || exit 1
+    awk -F'\t' -v q="$q" '$1 == "findfp" &&
+      (index(tolower($2), tolower(q)) || index(tolower($3), tolower(q)) ||
+       index(tolower($5), tolower(q))) {
+        printf "%s\t%s\t%s\t%s\n", $2, $3, $4, $5
+      }' "$db" ;;
+  info)
+    app=${2:-}
+    [ -n "$app" ] || exit 1
+    awk -F'\t' -v a="$app" '$1 == "findfp" && $2 == a {
+      printf "ID: %s\nName: %s\nVersion: %s\nDescription: %s\n", $2, $3, $4, $5
+      found = 1
+    } END { exit found ? 0 : 1 }' "$db" ;;
+  install) shift; echo "FAKE-SUDO: flatpak install $*" >> "${FAKE_SUDO_LOG:?}" ;;
   uninstall) shift; echo "FAKE-SUDO: flatpak uninstall $*" >> "${FAKE_SUDO_LOG:?}" ;;
 esac

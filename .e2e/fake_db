@@ -14,3 +14,7 @@ fpref	com.microsoft.Edge/x86_64/stable	156.0.4314.52-1
 fprun	com.microsoft.Edge	org.freedesktop.Platform/x86_64/25.08
 fprun	org.freedesktop.Platform/x86_64/25.08	org.freedesktop.Platform/x86_64/25.08
 up flatpak	org.freedesktop.Platform/x86_64/25.08	Freedesktop Platform	26.3
+find	extra	sed	4.11-1	GNU stream editor
+find	extra	nano	8.0-1	Small and friendly text editor
+find	aur	tribler	2.3.0-1	Privacy focused torrent client
+findfp	com.microsoft.Edge	Microsoft Edge	156.0.4314.52	Fast and secure browser

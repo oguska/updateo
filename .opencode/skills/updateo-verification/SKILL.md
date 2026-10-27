@@ -61,19 +61,28 @@ rustfmt --edition 2024 src/<file>.rs   # only when the diff is yours
 7. Cancelling with Esc runs nothing and leaves `sudo.log` empty.
 8. Installing (`i nano`) reaches the wrapper as
    `pacman -S --noconfirm nano`, proving the Y prompt is skipped.
+9. `/sed` narrows the visible list (uses `--reject nano`) and keeps the filter
+   title.
+10. `s nano` + Enter searches `pacman -Ss`; a second Enter opens details via
+    `pacman -Si extra/nano`.
+11. `u` previews the apply plan, including `pacman -Syu`, without running it.
+12. Esc on the apply popup cancels and leaves `sudo.log` empty.
+13. `u` + `y` confirms and reaches the wrapper with `pacman -Syu nano sed`.
+14. `d` on a wide terminal opens the details sidebar with `pacman -Si` output.
 
 The harness is `.e2e/screen_dump.py`:
 
 ```sh
 python3 .e2e/screen_dump.py <XDG_DATA_HOME> "<keys>" \
-  [--expect TEXT]... [--log TEXT]... [--input-cell TEXT] \
+  [--expect TEXT]... [--reject TEXT]... [--log TEXT]... [--input-cell TEXT] \
   [--width N] [--height N] [--sudo PATH]
 ```
 
 Key syntax: literal characters plus `<CR>`, `<BS>`, `<ESC>`, `<UP>`, `<DOWN>`,
 `<TAB>`, `<SP>`, `<BACKTAB>`. Keys are sent 150 ms apart. Use `--expect` for
-rendered text, `--log` for exact fake-command lines, and `--input-cell` only
-when the input line is visible (it looks for the `Enter/Esc` hint).
+rendered text, `--reject` for text that must be absent, `--log` for exact
+fake-command lines, and `--input-cell` only when the input line is visible (it
+looks for the `Enter/Esc` hint).
 
 When adding a behavior probe:
 

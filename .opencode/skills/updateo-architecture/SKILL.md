@@ -16,13 +16,14 @@ logic.
 ## Stack and layout
 
 Rust 2024, ratatui 0.30.2, crossterm 0.29, `tui-input` 0.15,
-`tui-popup` 0.7, rusqlite (bundled), serde/serde_json, chrono.
+`tui-popup` 0.7, `tui-big-text` 0.8, `tui-scrollbar` 0.2, rusqlite (bundled),
+serde/serde_json, chrono.
 
 | Path | Responsibility |
 |------|----------------|
 | `src/main.rs` | CLI dispatch (`check [--notify]`, `install-timer`, `uninstall-timer`, default TUI), terminal setup, panic hook. |
-| `src/app.rs` | `App` state, tabs, async checks, key handling, all rendering, install/remove input modes, removal popup, layout/truncation helpers. |
-| `src/sources.rs` | `Source`/`Update`, check commands and parsers, command builders, `UPDATEO_SUDO`, name validation, removal plans, installed versions, previews. |
+| `src/app.rs` | `App` state, tabs, async checks/search, key handling, all rendering, filter/search/details/apply/install/remove popups, layout/truncation helpers. |
+| `src/sources.rs` | `Source`/`Update`/`SearchHit`, check/search/detail commands and parsers, command builders, `UPDATEO_SUDO`, name validation, removal plans, installed versions, previews. |
 | `src/history.rs` | SQLite history at `$XDG_DATA_HOME/updateo/history.db`; one-time `history.jsonl` import; `record`, `load`, `is_success`. |
 | `src/runner.rs` | `run_suspended`: leaves raw mode/alternate screen, runs a child on the real TTY, restores the TUI. |
 | `src/i18n.rs` | `tr(en, tr)`; language from `LC_ALL` → `LC_MESSAGES` → `LANG`; `tr` prefix means Turkish, everything else English. |
@@ -34,15 +35,19 @@ Rust 2024, ratatui 0.30.2, crossterm 0.29, `tui-input` 0.15,
    `terminal.draw(|f| app.draw(f))` and `app.handle_events()`.
 2. `spawn_checks` starts one thread per `Source::ALL` and sends `CheckMsg`
    through an mpsc channel; `drain` collects results, lowers `checking`, and
-   sorts with `sources::sort_updates`.
+   sorts with `sources::sort_updates`. Search uses a second channel
+   (`SearchMsg` + `SearchState.id`) so stale responses are dropped.
 3. Tabs are `0 = pacman`, `1 = AUR`, `2 = Flatpak`, `3 = history`
    (`TAB_COUNT = Source::ALL.len() + 1`). `tab_items` maps tab-local cursor
-   positions to global `updates` indexes.
-4. `handle_events` polls for 100 ms. Priority for keys is:
-   removal popup → package input line → normal list keys.
+   positions to global `updates` indexes and applies the `/` filter.
+4. `handle_events` polls for 120 ms, then drains checks and search. Key
+   priority is: removal → apply → details → search → filter input → package
+   input → normal list keys.
 5. Normal keys: `j/k`, arrows, PageUp/Down, Home/End move; `space` toggles;
    `a` toggles the tab; `r` rechecks; `R` runs `pacman -Sy` then rechecks;
-   `u`/Enter applies selected updates; `i` installs; `x`/`X` removes; `q`/Esc quits.
+   `/` filters; `s` searches; `d` opens details; `u`/Enter opens the apply
+   confirmation; `i` installs; `x`/`X` removes; `q`/Esc quits. Esc clears a
+   non-empty filter before it quits.
 6. `run_suspended` is used for every command that may need sudo/polkit or an
    interactive package-manager flow. The TUI is restored afterward and history
    is recorded before `spawn_checks`.
@@ -62,8 +67,14 @@ Rust 2024, ratatui 0.30.2, crossterm 0.29, `tui-input` 0.15,
   ask for a password.
 - Remove: pacman/AUR `pacman -Rns <names>`, Flatpak `flatpak uninstall <names>`.
   The in-app removal popup is the confirmation step.
-- Update previews (`install_preview`, `remove_preview`) must match the real
-  command and are shown on the input line / removal footer.
+- Search: pacman `pacman -Ss <query>`, AUR `yay -Ss <query>`, Flatpak
+  `flatpak search <query> --columns=application,name,version,description`.
+  Queries are single args and reject a leading `-`.
+- Details: pacman `-Qi`, or `-Si repo/name` when a repo is known, falling
+  back to `-Qi`; AUR `yay -Si`, falling back to `pacman -Qi`; Flatpak
+  `flatpak info`.
+- Update previews (`install_preview`, `remove_preview`, `apply_preview`) must
+  match the real command and are shown on the input line / popups.
 
 ## Safety and parsing rules
 
@@ -77,7 +88,8 @@ Rust 2024, ratatui 0.30.2, crossterm 0.29, `tui-input` 0.15,
   (`pactree -r --depth=1`) or Flatpak runtime users, notes, and block reasons.
 - Parsers are pure and unit-tested (`parse_arrow_lines`, `parse_flatpak_lines`,
   `parse_q_version`, `parse_ref_version`, `parse_runtime_users`,
-  `parse_reverse_deps`). Add tests there rather than testing `Command` output.
+  `parse_reverse_deps`, `parse_search_lines`, `parse_flatpak_search`). Add tests
+  there rather than testing `Command` output.
 - `capture` treats exit 1/2 with empty stderr as the “no updates” convention.
 
 ## UI conventions
@@ -91,8 +103,17 @@ Rust 2024, ratatui 0.30.2, crossterm 0.29, `tui-input` 0.15,
   share width budget between label, preview, input, and hint.
 - `draw_removal` keeps counts at the top and the command preview pinned at the
   bottom; the list scrolls between them. Keep this invariant for small terminals.
-- Backend widgets are `Block`/`Paragraph`; the removal dialog uses
-  `tui_popup::Popup` with `KnownSizeWrapper`.
+- The apply, search, and details popups use `KnownSizeWrapper`; only one modal
+  owns keys at a time (see priority above). Details is a right sidebar at
+  >=84 columns when search is closed, otherwise a popup.
+- The list/history scrollbar uses `tui-scrollbar` in a one-column area; the
+  hero title uses `tui-big-text` only at >=64x18 so small terminals keep their
+  list height.
+- Status text shows a braille spinner, `done/total`, and an ETA while checks
+  run; keep user-facing status messages durable when a post-action recheck can
+  overwrite them.
+- Backend widgets are `Block`/`Paragraph`; modals use `tui_popup::Popup` with
+  `KnownSizeWrapper`, and the list/history use `tui-scrollbar`.
 
 ## Tests
 

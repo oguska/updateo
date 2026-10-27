@@ -94,6 +94,45 @@ run "install skips the Y confirmation" \
     --width 100 --height 30 \
     --log "FAKE-SUDO: pacman -S --noconfirm nano"
 
+# 9) canlı filtre: yalnız eşleşen satır kalır, sekme rozeti toplamı korur
+run "live filter narrows the list" \
+    env LC_ALL=en_US.UTF-8 python3 .e2e/screen_dump.py .e2e/xdgA "/sed<CR>" \
+    --width 100 --height 30 \
+    --expect "filter: sed" --expect "4.10-2.1 -> 4.11-1" --reject "nano"
+
+# 10) paket arama + ayrıntı: pacman -Ss sonucu ve pacman -Si detayı
+run "package search opens details" \
+    env LC_ALL=en_US.UTF-8 python3 .e2e/screen_dump.py .e2e/xdgA "s nano<CR><CR>" \
+    --width 100 --height 30 \
+    --expect "extra/nano" --expect "Small and friendly text editor" \
+    --expect "details · extra/nano" --expect "Repository      : extra"
+
+# 11) uygulama onayı: plan görünür, henüz komut çalışmaz
+run "apply dialog previews the plan" \
+    env LC_ALL=en_US.UTF-8 python3 .e2e/screen_dump.py .e2e/xdgA "u" \
+    --width 100 --height 30 \
+    --expect "Apply updates" --expect "pacman -Syu" --expect "y/Enter apply"
+test -s .e2e/sudo.log && { echo "    FAIL: önizlemede sudo.log dolu"; fail=$((fail + 1)); }
+
+# 12) uygulama iptali: Esc pencereyi kapatır, hiçbir şey çalıştırmaz
+run "apply dialog cancels without running" \
+    env LC_ALL=en_US.UTF-8 python3 .e2e/screen_dump.py .e2e/xdgA "u<ESC>" \
+    --width 100 --height 30 --expect "Apply cancelled."
+test -s .e2e/sudo.log && { echo "    FAIL: iptal sonrası sudo.log dolu"; fail=$((fail + 1)); }
+
+# 13) onaylanan uygulama: seçili paketler sarmalayıcıya gider
+run "confirmed apply reaches the wrapper" \
+    env LC_ALL=en_US.UTF-8 python3 .e2e/screen_dump.py .e2e/xdgA "uy" \
+    --width 100 --height 30 \
+    --log "FAKE-SUDO: pacman -Syu nano sed"
+
+# 14) geniş uçbirimde ayrıntı sağ panelde açılır (arama yokken)
+run "details sidebar opens on wide terminal" \
+    env LC_ALL=en_US.UTF-8 python3 .e2e/screen_dump.py .e2e/xdgA "d" \
+    --width 100 --height 30 \
+    --expect "details · nano" --expect "Name            : nano" \
+    --expect "Repository      : extra"
+
 echo "----"
 if [ "$fail" -eq 0 ]; then
     echo "ALL PROBES OK"

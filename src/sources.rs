@@ -45,6 +45,30 @@ pub struct Update {
     pub selected: bool,
 }
 
+/// Paket arama sonucu: `pacman -Ss` / `yay -Ss` / `flatpak search` satırı.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SearchHit {
+    pub source: Source,
+    /// Depo adı (`extra`, `aur`…); Flatpak'ta boş.
+    pub repo: String,
+    /// Kurulum komutuna giden çıplak ad / uygulama kimliği.
+    pub name: String,
+    pub version: String,
+    pub description: String,
+    pub installed: bool,
+}
+
+impl SearchHit {
+    /// Listede gösterilecek `depo/ad` biçimi.
+    pub fn display(&self) -> String {
+        if self.repo.is_empty() {
+            self.name.clone()
+        } else {
+            format!("{}/{}", self.repo, self.name)
+        }
+    }
+}
+
 pub fn check(src: Source) -> CheckResult {
     match src {
         Source::Pacman => check_pacman(),
@@ -444,6 +468,149 @@ pub fn check_flatpak() -> CheckResult {
     Ok(parse_flatpak_lines(&out, &installed))
 }
 
+/// Depoda paket ara: pacman/AUR `-Ss`, Flatpak `search`. Sorgu tek argümandır;
+/// `-` ile başlayan sorgu seçenek enjeksiyonunu engellemek için reddedilir.
+pub fn search(src: Source, query: &str) -> Result<Vec<SearchHit>, String> {
+    let query = query.trim();
+    if query.is_empty() {
+        return Err(tr("empty search query", "boş arama sorgusu"));
+    }
+    if query.starts_with('-') {
+        return Err(tr(
+            "search query may not start with '-'",
+            "arama sorgusu '-' ile başlayamaz",
+        ));
+    }
+    let out = match src {
+        Source::Pacman => capture(cmd("pacman", &["-Ss", query]))?,
+        Source::Aur => capture(cmd("yay", &["-Ss", query]))?,
+        Source::Flatpak => capture(cmd(
+            "flatpak",
+            &[
+                "search",
+                query,
+                "--columns=application,name,version,description",
+            ],
+        ))?,
+    };
+    Ok(match src {
+        Source::Flatpak => parse_flatpak_search(&out),
+        Source::Pacman | Source::Aur => parse_search_lines(&out, src),
+    })
+}
+
+/// `pacman -Ss` / `yay -Ss`: başlık `depo/ad sürüm [installed]`, ardından
+/// girintili açıklama satırları gelir. Açıklamalar tek satırda birleştirilir.
+fn parse_search_lines(text: &str, source: Source) -> Vec<SearchHit> {
+    let mut hits: Vec<SearchHit> = Vec::new();
+    let mut current: Option<SearchHit> = None;
+    for line in text.lines() {
+        if line.chars().next().is_some_and(char::is_whitespace) {
+            let desc = line.trim();
+            if let Some(hit) = current.as_mut()
+                && !desc.is_empty()
+            {
+                if !hit.description.is_empty() {
+                    hit.description.push(' ');
+                }
+                hit.description.push_str(desc);
+            }
+            continue;
+        }
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        let mut parts = line.split_whitespace();
+        let (Some(id), Some(version)) = (parts.next(), parts.next()) else {
+            continue;
+        };
+        let (repo, name) = match id.split_once('/') {
+            Some((repo, name)) => (repo, name),
+            None => ("", id),
+        };
+        let hit_source = if source == Source::Aur && repo != "aur" {
+            Source::Pacman
+        } else {
+            source
+        };
+        if let Some(prev) = current.take() {
+            hits.push(prev);
+        }
+        current = Some(SearchHit {
+            source: hit_source,
+            repo: repo.to_string(),
+            name: name.to_string(),
+            version: version.to_string(),
+            description: String::new(),
+            installed: line.contains("[installed]"),
+        });
+    }
+    if let Some(hit) = current {
+        hits.push(hit);
+    }
+    hits
+}
+
+/// `flatpak search --columns=application,name,version,description` satırları.
+fn parse_flatpak_search(text: &str) -> Vec<SearchHit> {
+    let mut hits = Vec::new();
+    for line in text.lines() {
+        let cols: Vec<&str> = line.split('\t').map(str::trim).collect();
+        let Some(app) = cols.first().copied().filter(|s| !s.is_empty()) else {
+            continue;
+        };
+        hits.push(SearchHit {
+            source: Source::Flatpak,
+            repo: String::new(),
+            name: app.to_string(),
+            version: cols.get(2).copied().unwrap_or("").to_string(),
+            description: cols.get(3).copied().unwrap_or("").to_string(),
+            installed: false,
+        });
+    }
+    hits
+}
+
+/// Seçili paketin ayrıntıları: pacman `-Qi` (kurulu) / `-Si` (depo),
+/// AUR `yay -Si`, Flatpak `flatpak info`. Satırlar panelde gösterilir.
+pub fn package_details(src: Source, repo: &str, name: &str) -> Result<Vec<String>, String> {
+    let out = match src {
+        Source::Pacman => {
+            let primary = if repo.is_empty() {
+                capture(cmd("pacman", &["-Qi", name]))
+            } else {
+                let reference = format!("{repo}/{name}");
+                capture(cmd("pacman", &["-Si", &reference]))
+            };
+            match primary {
+                Ok(out) => out,
+                Err(_) => capture(cmd("pacman", &["-Qi", name]))?,
+            }
+        }
+        Source::Aur => match capture(cmd("yay", &["-Si", name])) {
+            Ok(out) => out,
+            Err(_) => capture(cmd("pacman", &["-Qi", name]))?,
+        },
+        Source::Flatpak => capture(cmd("flatpak", &["info", name]))?,
+    };
+    Ok(out
+        .lines()
+        .map(str::trim_end)
+        .filter(|line| !line.is_empty())
+        .map(str::to_string)
+        .collect())
+}
+
+/// Uygulama komutunun insan okunur dökümü (onay penceresinde).
+pub fn apply_preview(src: Source) -> String {
+    match src {
+        Source::Pacman => format!("{} pacman -Syu", sudo_wrapper()),
+        Source::Aur => "yay -S".into(),
+        Source::Flatpak => "flatpak update".into(),
+    }
+}
+
 /// Sıralama ölçütü: kaynak → düz uygulamalar önce, runtime/uzantılar sonra → ad.
 pub fn sort_updates(v: &mut [Update]) {
     v.sort_by(|a, b| {
@@ -608,6 +775,41 @@ mod tests {
         assert!(v[1].runtime);
         // kurulu eşleşmesi ref'in ilk bölümüyle: branch (x86_64/51) değil
         assert_eq!(v[1].from, "51.6");
+    }
+
+    #[test]
+    fn arama_satirlari_ayristirilir() {
+        let hits = parse_search_lines(
+            "extra/nano 8.2-1 [installed]\n\
+             \x20   Pico text editor\n\
+             \x20   with syntax highlighting\n\
+             aur/tribler 2.3.0-1 (+10 1.00)\n\
+             \x20   Anonymous BitTorrent client\n",
+            Source::Aur,
+        );
+        assert_eq!(hits.len(), 2);
+        assert_eq!(hits[0].display(), "extra/nano");
+        assert_eq!(hits[0].source, Source::Pacman); // yay'ın depo sonucu
+        assert!(hits[0].installed);
+        assert_eq!(
+            hits[0].description,
+            "Pico text editor with syntax highlighting"
+        );
+        assert_eq!(hits[1].source, Source::Aur);
+        assert_eq!(hits[1].name, "tribler");
+
+        let fp = parse_flatpak_search("com.microsoft.Edge\tMicrosoft Edge\t156.0\tFast browser\n");
+        assert_eq!(fp.len(), 1);
+        assert_eq!(fp[0].source, Source::Flatpak);
+        assert_eq!(fp[0].name, "com.microsoft.Edge");
+        assert_eq!(fp[0].version, "156.0");
+        assert_eq!(fp[0].description, "Fast browser");
+    }
+
+    #[test]
+    fn bos_ve_secenekli_arama_reddedilir() {
+        assert!(search(Source::Pacman, "   ").is_err());
+        assert!(search(Source::Aur, "-Sw").is_err());
     }
 
     #[test]

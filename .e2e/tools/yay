@@ -1,5 +1,25 @@
 #!/bin/sh
+# Sahte yay: arama/sorgu verileri UPDATEO_FAKE_DB'den; kurulum yalnız loglar.
+db="${UPDATEO_FAKE_DB:?}"
 case "${1:-}" in
-  -Qua) grep '^up aur' "${UPDATEO_FAKE_DB:?}" | sed 's/^up aur\t//' ;;
+  -Qua) grep '^up aur' "$db" | sed 's/^up aur\t//' ;;
+  -Ss)
+    q=${2:-}
+    [ -n "$q" ] || exit 1
+    awk -F'\t' -v q="$q" '
+      FNR == NR { if ($1 == "inst") inst[$2] = 1; next }
+      $1 == "find" &&
+        (index(tolower($3), tolower(q)) || index(tolower($5), tolower(q))) {
+          printf "%s/%s %s", $2, $3, $4
+          if (inst[$3]) printf " [installed]"
+          printf "\n    %s\n", $5
+        }
+    ' "$db" "$db" ;;
+  -Si)
+    pkg=${2##*/}
+    awk -F'\t' -v p="$pkg" '$1 == "find" && $3 == p {
+      printf "Name            : %s\nVersion         : %s\nDescription     : %s\nRepository      : %s\n", $3, $4, $5, $2
+      found = 1
+    } END { exit found ? 0 : 1 }' "$db" ;;
   *) echo "FAKE-SUDO: yay $*" >> "${FAKE_SUDO_LOG:?}" ;;
 esac

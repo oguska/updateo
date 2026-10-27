@@ -8,5 +8,23 @@ case "${1:-}" in
     line=$(awk -F'\t' -v p="$2" '$1=="inst" && $2==p {print $2"\t"$3; exit}' "$db" | tr '\t' ' ')
     [ -n "$line" ] || exit 1
     echo "$line" ;;
+  -Ss)
+    q=${2:-}
+    [ -n "$q" ] || exit 1
+    awk -F'\t' -v q="$q" '
+      FNR == NR { if ($1 == "inst") inst[$2] = 1; next }
+      $1 == "find" && $2 != "aur" &&
+        (index(tolower($3), tolower(q)) || index(tolower($5), tolower(q))) {
+          printf "%s/%s %s", $2, $3, $4
+          if (inst[$3]) printf " [installed]"
+          printf "\n    %s\n", $5
+        }
+    ' "$db" "$db" ;;
+  -Qi|-Si)
+    [ -n "${2:-}" ] || exit 1
+    pkg=${2##*/}
+    awk -F'\t' -v p="$pkg" 'FNR == NR { if ($1 == "inst" && $2 == p) v = $3; next }
+      $1 == "find" && $3 == p { printf "Name            : %s\nVersion         : %s\nDescription     : %s\nRepository      : %s\n", $3, (v ? v : $4), $5, $2; found = 1 }
+      END { exit found ? 0 : 1 }' "$db" "$db" ;;
   *) exit 0 ;;
 esac

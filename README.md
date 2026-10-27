@@ -13,9 +13,20 @@ listeler, paket paket seçmene olanak tanır ve güncellemeleri doğrudan uygula
   (`~/.local/share/updateo/history.db` — SQLite; eski `history.jsonl` ilk
   açılışta bir kez içe aktarılır)
 - Paket paket seçim (`space`), sekmede tümünü seç/kaldır (`a`)
-- `u` ile uygulama: TUI geçici olarak askıya alınır; `sudo pacman -Syu`,
-  `yay -S` ve `flatpak update` gerçek TTY'de, tüm etkileşimli onaylarıyla
-  (parola sorusu, pacman çatışma onayları, yay derleme akışı) çalışır
+- `/` ile geçerli sekmede canlı filtre: ad, görünen ad ve sürüm alanlarında
+  anında daraltır; Enter filtreyi korur, Esc temizler
+- `s` ile paket arama: geçerli kaynağın `pacman -Ss` / `yay -Ss` /
+  `flatpak search` sonuçları popup'ta; Enter ayrıntı, Ctrl+I seçili sonucu kurar
+- `d` ile paket ayrıntısı: geniş uçbirimde sağ panel, dar uçbirimde popup
+  (`pacman -Qi/-Si`, `yay -Si`, `flatpak info`)
+- Görsel yenileme: `tui-scrollbar` ile liste/geçmiş kaydırma çubuğu, geniş
+  uçbirimde big-text başlık, kontrol sırasında braille spinner + `tamamlanan/toplam`
+  + kalan süre tahmini
+- `u`/`Enter` ile uygulama: önce kaynak bazında plan onay penceresi açılır
+  (`y`/Enter uygular); onaydan sonra TUI geçici olarak askıya alınır;
+  `sudo pacman -Syu`, `yay -S` ve `flatpak update` gerçek TTY'de, tüm
+  etkileşimli onaylarıyla (parola sorusu, pacman çatışma onayları, yay derleme
+  akışı) çalışır
 - Tek paket kurma: `i` alt barda isim girişi açar; Enter mevcut sekmenin
   kurucusunu (`sudo pacman -S --noconfirm` / `yay -S --noconfirm` /
   `flatpak install -y`) gerçek TTY'de çalıştırır — kurulum onayı (Y) sorulmaz,
@@ -44,13 +55,22 @@ j / k / ↑ / ↓   hareket          PageUp/PageDown  10 atla
 space           seçim            a                sekmede tümünü seç
 1 / 2 / 3 / 4   sekmeler (4 = geçmiş)   Tab / Ok tuşları  sekme değiştir
 r               yeniden kontrol  R                db tazele (sudo pacman -Sy)
-u / Enter       seçili paketleri güncelle        q / Esc  çık
+/               canlı filtre (Enter koru, Esc temizle)
+s               paket ara (yaz, Enter ara/ayrıntı, ↑/↓ seç, Ctrl+I kur, Esc kapat)
+d               ayrıntı paneli (j/k kaydır, d/Esc kapat)
+u / Enter       seçili paketleri güncelle (önce plan onayı; y/Enter uygula)
+q / Esc         çık
 i               tek paket kur (sudo pacman -S --noconfirm /
                 yay -S --noconfirm / flatpak install -y; onay sormaz,
                 Enter başlatır, Esc vazgeçer)
 x               kaldırılacak ad/ları yaz (Enter onay penceresini açar)
 X               seçili satırları (seçili yoksa imleçtekini) kaldırmaya hedefle
 ```
+
+Filter yalnız görünümü daraltır; gizlenen satırların seçimi korunur. Arama
+popup'ında yazılan sorgu `pacman -Ss` / `yay -Ss` / `flatpak search` ile
+çalışır; `Enter` sorgu değiştiyse arar, değişmediyse seçili sonucun ayrıntısını
+açar. `Ctrl+I` seçili sonucu geldiği kaynağın kurucusuyla kurar.
 
 Kaldırma onay penceresi: her hedef için kurulu sürüm, `pactree -r` ters
 bağımlıları (Flatpak'ta o runtime'ı kullanan uygulamalar), uyarılar ve
@@ -72,11 +92,11 @@ Kurulum: `sudo install -Dm755 target/release/updateo /usr/local/bin/updateo`
 
 ## Nasıl çalışıyor
 
-| Kaynak  | Kontrol                          | Uygulama                 |
-|---------|----------------------------------|--------------------------|
-| pacman  | `checkupdates` (pacman-contrib), yoksa `pacman -Qu` | `sudo pacman -Syu <pkgler>` |
-| AUR     | `yay -Qua`                       | `yay -S <pkgler>`        |
-| Flatpak | `flatpak remote-ls --updates`    | `flatpak update <refler>` |
+| Kaynak  | Kontrol                          | Uygulama                 | Arama / ayrıntı |
+|---------|----------------------------------|--------------------------|-----------------|
+| pacman  | `checkupdates` (pacman-contrib), yoksa `pacman -Qu` | `sudo pacman -Syu <pkgler>` | `pacman -Ss` / `pacman -Qi`, `pacman -Si depo/ad` |
+| AUR     | `yay -Qua`                       | `yay -S <pkgler>`        | `yay -Ss` / `yay -Si` |
+| Flatpak | `flatpak remote-ls --updates`    | `flatpak update <refler>` | `flatpak search` / `flatpak info` |
 
 Notlar:
 - Repo listesi önbellekteki veritabanlarına bakar; en taze sonuç için `R` ile
@@ -86,6 +106,12 @@ Notlar:
   `UPDATEO_SUDO=doas updateo` ile değiştirilebilir (`UPDATEO_SUDO="doas -n"`
   gibi önek argümanlar da desteklenir).
 - AUR sorgusu ağ ister (yay, AUR RPC API'sine bakar).
+- `s` araması geçerli sekmenin kaynağında çalışır; AUR sonuçlarında repo
+  `aur` değilse sonuç pacman paketi sayılır. `d`/Enter ayrıntısı seçili
+  sürümün kaynağına göre `-Si`, `-Qi` veya `flatpak info` kullanır.
+- `u` planı seçili paketleri kaynak bazında gruplar; onay penceresinde her
+  kaynağın çalıştırılacak komutu görünür. Filter yalnız görünümü daralttığı
+  için gizlenen seçili paketler de plana girer.
 - `i` ile kurulumda pacman/yay `--noconfirm`, flatpak `-y` kullanır: kurulum
   onayı sorulmaz, yalnız sudo parolası gerekebilir.
 - Flatpak uygulamaları sistem kuruluma göre polkit/parola sorabilir.
@@ -105,9 +131,9 @@ Notlar:
 - [x] Paket kaldırma: `x` / `X` → onay penceresi (tui-popup) + `pactree -r`
       ters-bağımlılık özeti + `base`/`base-devel`/`systemd` koruması +
       kurulu-olmayan engeli → `sudo pacman -Rns` / `flatpak uninstall`
-- [ ] Paket arama ve `/` canlı filtre: `pacman -Ss` / `yay -Ss` çıktıları,
+- [x] Paket arama ve `/` canlı filtre: `pacman -Ss` / `yay -Ss` çıktıları,
       detay paneli (`pacman -Qi/-Si`, `flatpak info`)
-- [ ] Görsel yenileme: tui-scrollbar ile akıcı kaydırma, kontrol sırasında
+- [x] Görsel yenileme: tui-scrollbar ile akıcı kaydırma, kontrol sırasında
       animasyonlu spinner + eta, popup'lı onay akışı, big-text başlık
       (hepsi ratatui 0.30.2 ile uyumu test edildi)
 

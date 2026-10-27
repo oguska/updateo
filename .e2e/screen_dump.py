@@ -4,8 +4,8 @@
 Run the real app inside a pty, drive keys, rasterize the screen, then assert
 the visible text. Exits 0 when every expectation holds, 1 otherwise.
 
-usage: screen_dump.py XDG_STATE [keys] [--expect STR]... [--input-cell STR]
-       [--width N] [--height N]
+usage: screen_dump.py XDG_STATE [keys] [--expect STR]... [--reject STR]...
+       [--input-cell STR] [--width N] [--height N]
 
 keys: literal chars plus <CR> <BS> <ESC> <UP> <DOWN> <TAB>, each key held
 150ms apart so the 100ms tick can re-render between them.
@@ -112,12 +112,15 @@ def main():
     xdg, spec = argv[0], argv[1] if len(argv) > 1 else ""
     width, height = 82, 24
     expects, log_lines, input_cell, sudo = [], [], None, None
+    rejects = []
     rest = argv[2:]
     k = 0
     while k < len(rest):
         flag = rest[k]
         if flag == "--expect":
             expects.append(rest[k + 1]); k += 2
+        elif flag == "--reject":
+            rejects.append(rest[k + 1]); k += 2
         elif flag == "--log":
             log_lines.append(rest[k + 1]); k += 2
         elif flag == "--input-cell":
@@ -221,6 +224,9 @@ def main():
     for want in expects:
         if want not in flat:
             failures.append("beklenen metin yok: %r" % want)
+    for unwanted in rejects:
+        if unwanted in flat:
+            failures.append("beklenmeyen metin var: %r" % unwanted)
     sudo_calls = open(log).read() if os.path.exists(log) else ""
     for want in log_lines:
         if want not in sudo_calls:
