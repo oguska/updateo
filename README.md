@@ -23,9 +23,10 @@ listeler, paket paket seçmene olanak tanır ve güncellemeleri doğrudan uygula
   anında daraltır; Enter filtreyi korur, Esc temizler
 - `s` ile paket arama: geçerli kaynağın `pacman -Ss` / `yay -Ss` /
   `flatpak search` sonuçları popup'ta; Enter seçili sonucu kurar, Ctrl+D ayrıntı
-- `d` ile paket ayrıntısı: geniş uçbirimde sağ panel, dar uçbirimde popup
-  (`pacman -Qi/-Si`, `yay -Si`, `flatpak info` / kurulu olmayan aramalarda
-  `flatpak remote-info`)
+- `d` ile paket bilgisi: seçili paketin deposu, sürümü, açıklaması ve
+  bağımlılık/çalışma zamanı bilgileri görüntülenir (`pacman -Qi/-Si`,
+  `yay -Si`, `flatpak info` / kurulu olmayan aramalarda `flatpak remote-info`);
+  geniş uçbirimde sağ panel, dar uçbirimde popup açılır
 - Görsel yenileme: `tui-scrollbar` ile liste/geçmiş kaydırma çubuğu, geniş
   uçbirimde big-text başlık, kontrol sırasında braille spinner + `tamamlanan/toplam`
   + kalan süre tahmini
@@ -43,6 +44,8 @@ listeler, paket paket seçmene olanak tanır ve güncellemeleri doğrudan uygula
   masaüstü uçbiriminde açar; `notify-send` yoksa journal'a düşer
 - `~/.config/updateo/config.json` ile bildirim, onaysız güncelleme, günlük
   kontrol saati ve açılış kontrolü kalıcı olarak ayarlanır
+- `./bootstrap.sh` etkileşimli kurulum: binary'yi derleyip kurar; bildirim,
+  onaysız güncelleme, kontrol saati ve açılış kontrolünü sorarak yapılandırır
 - Tek statik binary, runtime bağımlılığı yok (SQLite gömülü)
 - Arayüz dili sistem dilinden seçilir: `LC_ALL` → `LC_MESSAGES` → `LANG`;
   `tr` öneki Türkçe, diğer her şey İngilizce

@@ -23,9 +23,10 @@ TUI, lets you pick packages individually, and applies them directly.
   fields immediately; Enter keeps the filter, Esc clears it
 - `s` package search: `pacman -Ss` / `yay -Ss` / `flatpak search` results in a
   popup; Enter installs the selected result, Ctrl+D opens its details
-- `d` package details: side panel on wide terminals, popup on narrow ones
-  (`pacman -Qi/-Si`, `yay -Si`, `flatpak info` / `flatpak remote-info` for
-  results that are not installed)
+- `d` package info: shows the selected package's repo, version, description,
+  and dependency/runtime information (`pacman -Qi/-Si`, `yay -Si`,
+  `flatpak info` / `flatpak remote-info` for results that are not installed);
+  a side panel opens on wide terminals, a popup on narrow ones
 - Visual refresh: `tui-scrollbar` on the list/history, big-text title on wide
   terminals, and a braille spinner + `done/total` + ETA while checking
 - `u`/`Enter` apply: a per-source plan popup opens first (`y`/Enter applies);
@@ -43,6 +44,9 @@ TUI, lets you pick packages individually, and applies them directly.
   missing, the message goes to the journal
 - `~/.config/updateo/config.json` persists notifications, unattended updates,
   the daily check time, and the login check
+- `./bootstrap.sh` interactive installer: builds and installs the binary, then
+  asks about notifications, unattended updates, the check time, and the login
+  check before writing the configuration
 - Single static binary, no runtime dependency (SQLite is embedded)
 - UI language follows the system locale: `LC_ALL` → `LC_MESSAGES` → `LANG`;
   a `tr` prefix selects Turkish, everything else English
