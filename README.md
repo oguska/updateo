@@ -5,13 +5,16 @@
 
 [English](README.en.md) · Türkçe
 
-Arch tabanlı sistemler (Arch, CachyOS, Manjaro…) için tek arayüzden güncelleme
-yöneticisi: **pacman (repo) + AUR (yay) + Flatpak** güncellemelerini tek TUI'de
-listeler, paket paket seçmene olanak tanır ve güncellemeleri doğrudan uygular.
+Arch tabanlı sistemler (Arch, CachyOS, Manjaro…) için tek arayüzden
+**güncelleme, paket kurma, kaldırma ve paket sorgulama** yöneticisi:
+**pacman (repo) + AUR (yay) + Flatpak** paketlerini tek TUI'de listeler,
+paket paket seçmene olanak tanır ve işlemleri doğrudan uygular.
 
 <img width="1062" height="604" alt="image" src="https://github.com/user-attachments/assets/5780f430-a5d0-4d42-98e4-75578e709082" />
 ## Özellikler
 
+- Dört temel işlem tek TUI'de: güncelleme (`u`), paket kurma (`i`), kaldırma
+  (`x`/`X`) ve paket sorgulama/arama (`s`/`d`)
 - Üç sekme: `pacman`, `AUR`, `Flatpak` — her birinde seçili/toplam rozeti
 - Flatpak'ta uygulamalar ile runtime/uzantılar ayrılır: runtime'lar sonra
   gelir, `(runtime)` etiketi ve kurulu sürümle (`eski -> yeni`) gösterilir
@@ -39,6 +42,10 @@ listeler, paket paket seçmene olanak tanır ve güncellemeleri doğrudan uygula
   kurucusunu (`sudo pacman -S --noconfirm` / `yay -S --noconfirm` /
   `flatpak install -y`) gerçek TTY'de çalıştırır — kurulum onayı (Y) sorulmaz,
   yalnız sudo parolası gerekebilir; sonuç geçmişe yazılır
+- Paket kaldırma: `x` ile ad yaz veya `X` ile seçili satırı hedefle; onay
+  penceresi kurulu sürümü, `pactree -r` ters bağımlılıklarını, Flatpak runtime
+  kullanıcılarını ve korunan paketleri gösterir. `y` ile `sudo pacman -Rns` /
+  `flatpak uninstall` gerçek TTY'de çalışır; sonuç geçmişe yazılır
 - Kontroller paralel thread'lerde; ağ hatası tek kaynağı düşürür, arayüzü kilitlemez
 - Eylemli masaüstü bildirimi: güncelleme varsa “Şimdi güncelle” düğmesi TUI'yi
   masaüstü uçbiriminde açar; `notify-send` yoksa journal'a düşer

@@ -5,12 +5,15 @@
 
 English · [Türkçe](README.md)
 
-A single-interface update manager for Arch-based systems (Arch, CachyOS,
-Manjaro…): it lists **pacman (repos) + AUR (yay) + Flatpak** updates in one
-TUI, lets you pick packages individually, and applies them directly.
+A single-interface **update, package install, removal, and package query**
+manager for Arch-based systems (Arch, CachyOS, Manjaro…): it lists
+**pacman (repos) + AUR (yay) + Flatpak** packages in one TUI, lets you pick
+packages individually, and runs the operations directly.
 
 ## Features
 
+- Four core operations in one TUI: update (`u`), install (`i`), remove
+  (`x`/`X`), and package query/search (`s`/`d`)
 - Three tabs: `pacman`, `AUR`, `Flatpak`, each with a selected/total badge
 - Flatpak applications are separated from runtime/extension updates: runtimes
   come last, carry a `(runtime)` label, and show the installed version
@@ -37,6 +40,11 @@ TUI, lets you pick packages individually, and applies them directly.
   the current tab's installer (`sudo pacman -S --noconfirm` / `yay -S
   --noconfirm` / `flatpak install -y`) in the real TTY — no Y confirmation,
   only a possible sudo password; the result is written to history
+- Package removal: type names with `x` or target the selected rows with `X`;
+  the confirmation popup shows the installed version, `pactree -r` reverse
+  dependencies, Flatpak runtime users, and protected packages. `y` runs
+  `sudo pacman -Rns` / `flatpak uninstall` in the real TTY; the result is
+  written to history
 - Checks run in parallel threads; a network failure only drops one source and
   never blocks the UI
 - Actionable desktop notification: when updates are available, an **Update
