@@ -7,14 +7,14 @@ the visible text. Exits 0 when every expectation holds, 1 otherwise.
 usage: screen_dump.py XDG_STATE [keys] [--expect STR]... [--reject STR]...
        [--input-cell STR] [--width N] [--height N]
 
-keys: literal chars plus <CR> <BS> <ESC> <UP> <DOWN> <TAB>, each key held
-150ms apart so the 100ms tick can re-render between them.
+keys: literal chars plus <CR> <BS> <ESC> <UP> <DOWN> <TAB> <C-D>, each key
+held 150ms apart so the 100ms tick can re-render between them.
 """
 import fcntl, os, pty, re, select, struct, subprocess, sys, termios, time
 
 KEYS = {"<CR>": b"\r", "<BS>": b"\x7f", "<ESC>": b"\x1b",
         "<UP>": b"\x1b[A", "<DOWN>": b"\x1b[B", "<TAB>": b"\t", "<SP>": b" ",
-        "<BACKTAB>": b"\x1b[Z"}
+        "<C-D>": b"\x04", "<BACKTAB>": b"\x1b[Z"}
 # crossterm'in TTY olmayan çıkışta bastığı bilgi satırı
 TAG = re.compile(rb"\bMouse Support - not a TTY\b")
 
@@ -102,7 +102,7 @@ def feed(sc, buf, pending=b""):
 
 def keys_of(spec):
     out = []
-    for tok in re.findall(r"<[A-Z]+>|.", spec):
+    for tok in re.findall(r"<[A-Z-]+>|.", spec):
         out.append(KEYS.get(tok, tok.encode()))
     return out
 

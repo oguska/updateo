@@ -100,12 +100,18 @@ run "live filter narrows the list" \
     --width 100 --height 30 \
     --expect "filter: sed" --expect "4.10-2.1 -> 4.11-1" --reject "nano"
 
-# 10) paket arama + ayrıntı: pacman -Ss sonucu ve pacman -Si detayı
+# 10) paket arama + ayrıntı: pacman -Ss sonucu ve Ctrl+D ile pacman -Si detayı
 run "package search opens details" \
-    env LC_ALL=en_US.UTF-8 python3 .e2e/screen_dump.py .e2e/xdgA "s nano<CR><CR>" \
+    env LC_ALL=en_US.UTF-8 python3 .e2e/screen_dump.py .e2e/xdgA "s nano<CR><C-D>" \
     --width 100 --height 30 \
     --expect "extra/nano" --expect "Small and friendly text editor" \
     --expect "details · extra/nano" --expect "Repository      : extra"
+
+# 10b) arama: seçili sonuca Enter kurulumu başlatır
+run "search Enter installs the selected result" \
+    env LC_ALL=en_US.UTF-8 python3 .e2e/screen_dump.py .e2e/xdgA "s nano<CR><CR>" \
+    --width 100 --height 30 \
+    --log "FAKE-SUDO: pacman -S --noconfirm nano"
 
 # 11) uygulama onayı: plan görünür, henüz komut çalışmaz
 run "apply dialog previews the plan" \
@@ -136,7 +142,7 @@ run "details sidebar opens on wide terminal" \
 
 # 15) arama sonuçlarında ok tuşları popup'ı kapatmaz; Down ikinci sonucu seçer
 run "search arrows keep the popup open" \
-    env LC_ALL=en_US.UTF-8 python3 .e2e/screen_dump.py .e2e/xdgA "s e<CR><DOWN><CR>" \
+    env LC_ALL=en_US.UTF-8 python3 .e2e/screen_dump.py .e2e/xdgA "s e<CR><DOWN><C-D>" \
     --width 100 --height 30 \
     --expect "details · extra/nano" --expect "Name            : nano"
 

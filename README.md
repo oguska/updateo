@@ -22,7 +22,7 @@ listeler, paket paket seçmene olanak tanır ve güncellemeleri doğrudan uygula
 - `/` ile geçerli sekmede canlı filtre: ad, görünen ad ve sürüm alanlarında
   anında daraltır; Enter filtreyi korur, Esc temizler
 - `s` ile paket arama: geçerli kaynağın `pacman -Ss` / `yay -Ss` /
-  `flatpak search` sonuçları popup'ta; Enter ayrıntı, Ctrl+I seçili sonucu kurar
+  `flatpak search` sonuçları popup'ta; Enter seçili sonucu kurar, Ctrl+D ayrıntı
 - `d` ile paket ayrıntısı: geniş uçbirimde sağ panel, dar uçbirimde popup
   (`pacman -Qi/-Si`, `yay -Si`, `flatpak info`)
 - Görsel yenileme: `tui-scrollbar` ile liste/geçmiş kaydırma çubuğu, geniş
@@ -76,7 +76,7 @@ space           seçim            a                sekmede tümünü seç
 1 / 2 / 3 / 4   sekmeler (4 = geçmiş)   Tab / Ok tuşları  sekme değiştir
 r               yeniden kontrol  R                db tazele (sudo pacman -Sy)
 /               canlı filtre (Enter koru, Esc temizle)
-s               paket ara (yaz, Enter ara/ayrıntı, ↑/↓ seç, Ctrl+I kur, Esc kapat)
+s               paket ara (yaz, Enter ara/kur, ↑/↓ seç, Ctrl+D ayrıntı, Esc kapat)
 d               ayrıntı paneli (j/k kaydır, d/Esc kapat)
 u / Enter       seçili paketleri güncelle (önce plan onayı; y/Enter uygula)
 q / Esc         çık
@@ -89,8 +89,8 @@ X               seçili satırları (seçili yoksa imleçtekini) kaldırmaya hed
 
 Filter yalnız görünümü daraltır; gizlenen satırların seçimi korunur. Arama
 popup'ında yazılan sorgu `pacman -Ss` / `yay -Ss` / `flatpak search` ile
-çalışır; `Enter` sorgu değiştiyse arar, değişmediyse seçili sonucun ayrıntısını
-açar. `Ctrl+I` seçili sonucu geldiği kaynağın kurucusuyla kurar.
+çalışır; `Enter` sorgu değiştiyse arar, değişmediyse seçili sonucu geldiği
+kaynağın kurucusuyla kurar. `Ctrl+D` seçili sonucun ayrıntısını açar.
 
 Kaldırma onay penceresi: her hedef için kurulu sürüm, `pactree -r` ters
 bağımlıları (Flatpak'ta o runtime'ı kullanan uygulamalar), uyarılar ve

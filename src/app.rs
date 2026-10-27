@@ -527,8 +527,8 @@ impl App {
             id: 0,
         });
         self.status = tr(
-            "Type a query, Enter searches the current source, Esc closes.",
-            "Sorgu yaz, Enter bulunulan kaynakta arar, Esc kapatır.",
+            "Type a query; Enter searches, then Enter installs the selected result.",
+            "Sorgu yaz; Enter arar, sonra Enter seçili sonucu kurar.",
         );
         self.status_err = false;
     }
@@ -679,11 +679,9 @@ impl App {
                 if changed || hit.is_none() {
                     self.search = Some(sess);
                     self.run_search();
-                } else {
-                    self.search = Some(sess);
-                    if let Some(hit) = hit {
-                        self.open_details(hit.source, &hit.repo, &hit.name);
-                    }
+                } else if let Some(hit) = hit {
+                    self.search = None;
+                    self.install_via(hit.source, vec![hit.name]);
                 }
             }
             KeyCode::Down => {
@@ -709,6 +707,13 @@ impl App {
             KeyCode::End => {
                 sess.cursor = sess.hits.len().saturating_sub(1);
                 self.search = Some(sess);
+            }
+            KeyCode::Char('d') if k.modifiers.contains(KeyModifiers::CONTROL) => {
+                let hit = sess.selected().cloned();
+                self.search = Some(sess);
+                if let Some(hit) = hit {
+                    self.open_details(hit.source, &hit.repo, &hit.name);
+                }
             }
             KeyCode::Char('i') if k.modifiers.contains(KeyModifiers::CONTROL) => {
                 let hit = sess.selected().cloned();
@@ -1827,8 +1832,8 @@ impl App {
         }
         lines.push(Line::from(Span::styled(
             tr(
-                "↑/↓ choose · Enter search/details · Ctrl+I install · Esc close",
-                "↑/↓ seç · Enter ara/ayrıntı · Ctrl+I kur · Esc kapat",
+                "↑/↓ choose · Enter install · Ctrl+D details · Esc close",
+                "↑/↓ seç · Enter kur · Ctrl+D ayrıntı · Esc kapat",
             ),
             Style::new().fg(Color::DarkGray),
         )));

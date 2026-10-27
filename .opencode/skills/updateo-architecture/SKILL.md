@@ -133,6 +133,8 @@ serde/serde_json, chrono.
 - The apply, search, and details popups use `KnownSizeWrapper`; only one modal
   owns keys at a time (see priority above). Details is a right sidebar at
   >=84 columns when search is closed, otherwise a popup.
+- Search typing edits the query, Up/Down navigate hits, Enter searches when the
+  query changed and otherwise installs the selected hit; Ctrl+D opens details.
 - The list/history scrollbar uses `tui-scrollbar` in a one-column area; the
   hero title uses `tui-big-text` only at >=64x18 so small terminals keep their
   list height.

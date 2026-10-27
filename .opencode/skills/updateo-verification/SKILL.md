@@ -83,15 +83,15 @@ rustfmt --edition 2024 src/<file>.rs   # only when the diff is yours
    `pacman -S --noconfirm nano`, proving the Y prompt is skipped.
 9. `/sed` narrows the visible list (uses `--reject nano`) and keeps the filter
    title.
-10. `s nano` + Enter searches `pacman -Ss`; a second Enter opens details via
-    `pacman -Si extra/nano`.
+10. `s nano` + Enter searches `pacman -Ss`; Ctrl+D opens details via
+    `pacman -Si extra/nano`, and a second Enter installs the selected result.
 11. `u` previews the apply plan, including `pacman -Syu`, without running it.
 12. Esc on the apply popup cancels and leaves `sudo.log` empty.
 13. `u` + `y` confirms and reaches the wrapper with `pacman -Syu nano sed`;
     the restored screen still shows the tabs, shortcut hint, and list title
     (regression guard for the post-suspension full repaint).
 14. `d` on a wide terminal opens the details sidebar with `pacman -Si` output.
-15. Search arrow keys keep the popup open; Down + Enter opens the second hit.
+15. Search arrow keys keep the popup open; Down + Ctrl+D opens the second hit.
 16. `check --notify` sends an actionable notification (`--action=update=...`)
     and the selected action launches the TUI in a fake terminal. This probe
     uses `.e2e/tools/notify-send` and `.e2e/fake_terminal` logs rather than a

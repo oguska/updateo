@@ -22,7 +22,7 @@ TUI, lets you pick packages individually, and applies them directly.
 - `/` live filter for the current tab: narrows name, display name, and version
   fields immediately; Enter keeps the filter, Esc clears it
 - `s` package search: `pacman -Ss` / `yay -Ss` / `flatpak search` results in a
-  popup; Enter opens details, Ctrl+I installs the selected result
+  popup; Enter installs the selected result, Ctrl+D opens its details
 - `d` package details: side panel on wide terminals, popup on narrow ones
   (`pacman -Qi/-Si`, `yay -Si`, `flatpak info`)
 - Visual refresh: `tui-scrollbar` on the list/history, big-text title on wide
@@ -77,8 +77,8 @@ space           select           a                select all in tab
 1 / 2 / 3 / 4   tabs (4 = history)   Tab / arrow keys  switch tab
 r               re-check         R                refresh db (sudo pacman -Sy)
 /               live filter (Enter keeps, Esc clears)
-s               package search (type, Enter search/details, ↑/↓ select,
-                                 Ctrl+I install, Esc close)
+s               package search (type, Enter search/install, ↑/↓ select,
+                                 Ctrl+D details, Esc close)
 d               details panel (j/k scroll, d/Esc close)
 u / Enter       update selected packages (plan confirmation first; y/Enter applies)
 q / Esc         quit
@@ -91,9 +91,9 @@ X               target selected rows (or the cursor row) for removal
 
 The filter only narrows the view; selections on hidden rows are preserved. The
 query in the search popup runs through `pacman -Ss` / `yay -Ss` / `flatpak
-search`; `Enter` searches when the query changed, otherwise it opens details
-for the selected result. `Ctrl+I` installs the selected result with its actual
-source's installer.
+search`; `Enter` searches when the query changed, otherwise it installs the
+selected result with its actual source's installer. `Ctrl+D` opens the selected
+result's details.
 
 The removal confirmation popup lists the installed version, `pactree -r`
 reverse dependencies (Flatpak apps using that runtime), warnings, and blocked
