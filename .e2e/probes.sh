@@ -88,6 +88,12 @@ if test -s .e2e/sudo.log; then
     fail=$((fail + 1))
 fi
 
+# 8) kurulum onay sormaz: pacman'e --noconfirm ile gidilir, Y beklenmez
+run "install skips the Y confirmation" \
+    env LC_ALL=en_US.UTF-8 python3 .e2e/screen_dump.py .e2e/xdgA "i nano<CR>" \
+    --width 100 --height 30 \
+    --log "FAKE-SUDO: pacman -S --noconfirm nano"
+
 echo "----"
 if [ "$fail" -eq 0 ]; then
     echo "ALL PROBES OK"

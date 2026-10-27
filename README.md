@@ -17,8 +17,9 @@ listeler, paket paket seçmene olanak tanır ve güncellemeleri doğrudan uygula
   `yay -S` ve `flatpak update` gerçek TTY'de, tüm etkileşimli onaylarıyla
   (parola sorusu, pacman çatışma onayları, yay derleme akışı) çalışır
 - Tek paket kurma: `i` alt barda isim girişi açar; Enter mevcut sekmenin
-  kurucusunu (sudo pacman -S / yay -S / flatpak install) gerçek TTY'de
-  çalıştırır, sonuç geçmişe yazılır
+  kurucusunu (`sudo pacman -S --noconfirm` / `yay -S --noconfirm` /
+  `flatpak install -y`) gerçek TTY'de çalıştırır — kurulum onayı (Y) sorulmaz,
+  yalnız sudo parolası gerekebilir; sonuç geçmişe yazılır
 - Kontroller paralel thread'lerde; ağ hatası tek kaynağı düşürür, arayüzü kilitlemez
 - Tek statik binary, runtime bağımlılığı yok (SQLite gömülü)
 - Arayüz dili sistem dilinden seçilir: `LC_ALL` → `LC_MESSAGES` → `LANG`;
@@ -44,7 +45,8 @@ space           seçim            a                sekmede tümünü seç
 1 / 2 / 3 / 4   sekmeler (4 = geçmiş)   Tab / Ok tuşları  sekme değiştir
 r               yeniden kontrol  R                db tazele (sudo pacman -Sy)
 u / Enter       seçili paketleri güncelle        q / Esc  çık
-i               tek paket kur (sudo pacman -S / yay -S / flatpak install;
+i               tek paket kur (sudo pacman -S --noconfirm /
+                yay -S --noconfirm / flatpak install -y; onay sormaz,
                 Enter başlatır, Esc vazgeçer)
 x               kaldırılacak ad/ları yaz (Enter onay penceresini açar)
 X               seçili satırları (seçili yoksa imleçtekini) kaldırmaya hedefle
@@ -84,6 +86,8 @@ Notlar:
   `UPDATEO_SUDO=doas updateo` ile değiştirilebilir (`UPDATEO_SUDO="doas -n"`
   gibi önek argümanlar da desteklenir).
 - AUR sorgusu ağ ister (yay, AUR RPC API'sine bakar).
+- `i` ile kurulumda pacman/yay `--noconfirm`, flatpak `-y` kullanır: kurulum
+  onayı sorulmaz, yalnız sudo parolası gerekebilir.
 - Flatpak uygulamaları sistem kuruluma göre polkit/parola sorabilir.
 
 ## Yol haritası
@@ -95,8 +99,9 @@ Notlar:
 - [x] systemd timer ile arka plan bildirimi — `updateo install-timer` + `check --notify`
 - [x] Geçmişin JSONL yerine SQLite'a taşınması (`history.db`, otomatik içe aktarma)
 - [x] İngilizce arayüz — sistem diline göre otomatik (TR/EN)
-- [x] Paket kurma: `i` → isim girişi (tui-input) → `pacman -S` / `yay -S` /
-      `flatpak install` mevcut askıya-alma akışıyla; sonuç geçmişe yazılır
+- [x] Paket kurma: `i` → isim girişi (tui-input) → `pacman -S --noconfirm` /
+      `yay -S --noconfirm` / `flatpak install -y` mevcut askıya-alma akışıyla;
+      sonuç geçmişe yazılır
 - [x] Paket kaldırma: `x` / `X` → onay penceresi (tui-popup) + `pactree -r`
       ters-bağımlılık özeti + `base`/`base-devel`/`systemd` koruması +
       kurulu-olmayan engeli → `sudo pacman -Rns` / `flatpak uninstall`

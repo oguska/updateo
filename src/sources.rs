@@ -84,14 +84,18 @@ fn with_wrapper(wrapper: &str, program: &str, args: &[&str]) -> Command {
     c
 }
 
-/// Tek paket kurma komutu: pacman kök sarmalayıcıdan geçer; yay ve flatpak
-/// yetkiyi kendi yönetir, gerçek TTY'de etkileşimli çalışır.
+/// Tek paket kurma komutu: onay soruları bayraklarla kapatılır (pacman/yay
+/// `--noconfirm`, flatpak `-y`); yalnız sudo parolası sorulabilir. pacman kök
+/// sarmalayıcıdan geçer; yay ve flatpak yetkiyi kendi yönetir.
 pub fn install_command(src: Source, names: &[String]) -> Command {
     let names: Vec<&str> = names.iter().map(String::as_str).collect();
     match src {
-        Source::Pacman => root_command("pacman", &[&["-S"], names.as_slice()].concat()),
-        Source::Aur => cmd("yay", &[&["-S"], names.as_slice()].concat()),
-        Source::Flatpak => cmd("flatpak", &[&["install"], names.as_slice()].concat()),
+        Source::Pacman => root_command(
+            "pacman",
+            &[&["-S", "--noconfirm"], names.as_slice()].concat(),
+        ),
+        Source::Aur => cmd("yay", &[&["-S", "--noconfirm"], names.as_slice()].concat()),
+        Source::Flatpak => cmd("flatpak", &[&["install", "-y"], names.as_slice()].concat()),
     }
 }
 
@@ -228,9 +232,9 @@ fn parse_ref_version(text: &str, target: &str) -> Option<String> {
 /// penceresinde gösterilir; çalıştırılan komutla aynı sözdizimi).
 pub fn install_preview(src: Source) -> String {
     match src {
-        Source::Pacman => format!("{} pacman -S", sudo_wrapper()),
-        Source::Aur => "yay -S".into(),
-        Source::Flatpak => "flatpak install".into(),
+        Source::Pacman => format!("{} pacman -S --noconfirm", sudo_wrapper()),
+        Source::Aur => "yay -S --noconfirm".into(),
+        Source::Flatpak => "flatpak install -y".into(),
     }
 }
 
@@ -470,17 +474,33 @@ mod tests {
 
     #[test]
     fn kurma_komutlari() {
+        // Kurulumlar onay sormaz: Y girdisi gerekmez.
         let hello = ["hello".to_string()];
         let c = install_command(Source::Aur, &hello);
         assert_eq!(c.get_program(), "yay");
-        assert_eq!(c.get_args().collect::<Vec<_>>(), ["-S", "hello"]);
+        assert_eq!(
+            c.get_args().collect::<Vec<_>>(),
+            ["-S", "--noconfirm", "hello"]
+        );
 
         let edge = ["com.microsoft.Edge".to_string()];
         let c = install_command(Source::Flatpak, &edge);
         assert_eq!(c.get_program(), "flatpak");
         assert_eq!(
             c.get_args().collect::<Vec<_>>(),
-            ["install", "com.microsoft.Edge"]
+            ["install", "-y", "com.microsoft.Edge"]
+        );
+
+        let sed = ["sed".to_string()];
+        let c = install_command(Source::Pacman, &sed);
+        let args: Vec<std::ffi::OsString> = c.get_args().map(|a| a.to_os_string()).collect();
+        assert_eq!(
+            c.get_program(),
+            std::ffi::OsStr::new(sudo_wrapper().as_str())
+        );
+        assert_eq!(
+            args[args.len() - 4..],
+            ["pacman", "-S", "--noconfirm", "sed"].map(std::ffi::OsString::from)
         );
 
         // birden çok ad tek komutta: pacman kök sarmalayıcıdan geçer

@@ -435,8 +435,9 @@ impl App {
         self.spawn_checks();
     }
 
-    /// Paket kurma: TUI askıya alınır, kurucu gerçek TTY'yi kullanır
-    /// (parola/onaylar dahil). Sonuç geçmişe yazılır, sonra yeniden kontrol.
+    /// Paket kurma: TUI askıya alınır, kurucu gerçek TTY'yi kullanır. Onay
+    /// soruları bayraklarla kapatılır; yalnız sudo parolası sorulabilir.
+    /// Sonuç geçmişe yazılır, sonra yeniden kontrol.
     fn install(&mut self, names: Vec<String>) {
         if self.is_hist_tab() {
             return;
