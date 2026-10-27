@@ -92,12 +92,7 @@ impl App {
                 Ok(list) => {
                     self.updates.retain(|u| u.source != msg.source);
                     self.updates.extend(list);
-                    self.updates.sort_by(|a, b| {
-                        a.source
-                            .order()
-                            .cmp(&b.source.order())
-                            .then(a.name.cmp(&b.name))
-                    });
+                    sources::sort_updates(&mut self.updates);
                 }
                 Err(e) => {
                     self.status = format!("{} kontrolü başarısız: {e}", msg.source.label());
@@ -503,6 +498,11 @@ impl App {
                     u.to.clone()
                 } else {
                     format!("{} -> {}", u.from, u.to)
+                };
+                let ver = if u.runtime {
+                    format!("{ver}  (runtime)")
+                } else {
+                    ver
                 };
                 let row = format!(
                     "{cursor} {check} {:<name_w$}  {ver}",

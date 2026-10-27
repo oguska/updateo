@@ -7,6 +7,8 @@ listeler, paket paket seçmene olanak tanır ve güncellemeleri doğrudan uygula
 ## Özellikler
 
 - Üç sekme: `pacman`, `AUR`, `Flatpak` — her birinde seçili/toplam rozeti
+- Flatpak'ta uygulamalar ile runtime/uzantılar ayrılır: runtime'lar sonra
+  gelir, `(runtime)` etiketi ve kurulu sürümle (`eski -> yeni`) gösterilir
 - Dördüncü sekme `geçmiş`: uygulanan güncellemelerin zaman damgalı kaydı
   (`~/.local/share/updateo/history.jsonl`)
 - Paket paket seçim (`space`), sekmede tümünü seç/kaldır (`a`)
@@ -57,7 +59,8 @@ Notlar:
 
 - [x] `r` sırasında db tazeleme seçeneği (`sudo pacman -Sy`) — `R` tuşu
 - [x] Güncelleme geçmişi (log) sekmesi — `4` tuşu, JSONL kaydı
-- [ ] flatpak çalışma saati/durum ayrımı (watch)
+- [x] flatpak runtime/uzantı ayrımı — `(runtime)` etiketi, sıralamada sonra,
+  kurulu sürüm gösterimi (`flatpak list` eşleşmesi ref'in ilk bölümüyle)
 - [ ] systemd timer ile arka plan bildirimi
 
 ## Lisans

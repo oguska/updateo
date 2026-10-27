@@ -2,6 +2,7 @@
 //! Her kaynak tek bir bloklamayan-yakalama çağrısı yapar; çıktı belgelenmiş
 //! satır formatlarına göre parse edilir.
 
+use std::collections::BTreeMap;
 use std::process::Command;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -37,6 +38,8 @@ pub struct Update {
     pub display: String,
     pub from: String,
     pub to: String,
+    /// Flatpak: runtime/uzantı (uygulama değil).
+    pub runtime: bool,
     pub selected: bool,
 }
 
@@ -59,7 +62,7 @@ pub fn root_command(program: &str, args: &[&str]) -> Command {
 }
 
 /// Komutu çalıştır, stdout döndür; başarısızlıkta stderr'i hata mesajı yap.
-fn capture(cmd: &mut Command) -> Result<String, String> {
+fn capture(mut cmd: Command) -> Result<String, String> {
     let out = cmd
         .output()
         .map_err(|e| format!("'{:?}' çalıştırılamadı: {e}", cmd.get_program()))?;
@@ -94,15 +97,17 @@ fn parse_arrow_lines(text: &str, source: Source) -> Vec<Update> {
             name,
             from: parts[1].to_string(),
             to: parts[3].to_string(),
+            runtime: false,
             selected: true, // updater aracı: varsayılan seçili, kullanıcı düşürür
         });
     }
     v
 }
 
-/// `flatpak remote-ls --updates --columns=app,name,version` satırları
-/// (sekme ayrımlı; runtimes için app sütunu `ref/branch` taşır).
-fn parse_flatpak_lines(text: &str) -> Vec<Update> {
+/// `flatpak remote-ls --updates --columns=app,name,version` satırları.
+/// Runtime/uzantıların app sütunu `ad/mimari/branch` taşır; kurulu sürüm
+/// eşleşmesi ilk bölüm (ad) üzerinden yapılır.
+fn parse_flatpak_lines(text: &str, installed: &BTreeMap<String, String>) -> Vec<Update> {
     let mut v = Vec::new();
     for line in text.lines() {
         let cols: Vec<&str> = line.split('\t').map(str::trim).collect();
@@ -110,6 +115,8 @@ fn parse_flatpak_lines(text: &str) -> Vec<Update> {
         if app.is_empty() {
             continue;
         }
+        let runtime = app.contains('/');
+        let key = app.split('/').next().unwrap_or(app);
         let name: &str = if cols.len() > 1 && !cols[1].is_empty() {
             cols[1]
         } else {
@@ -120,8 +127,9 @@ fn parse_flatpak_lines(text: &str) -> Vec<Update> {
             source: Source::Flatpak,
             display: name.to_string(),
             name: app.to_string(),
-            from: String::new(),
+            from: installed.get(key).cloned().unwrap_or_default(),
             to: version,
+            runtime,
             selected: true,
         });
     }
@@ -131,25 +139,61 @@ fn parse_flatpak_lines(text: &str) -> Vec<Update> {
 pub fn check_pacman() -> CheckResult {
     // pacman-contrib'un checkupdates'ı öncelikli (kendi geçici db'sini tazeler);
     // yoksa önbellekteki db ile `pacman -Qu`ya düşer.
-    if let Ok(out) = capture(&mut Command::new("checkupdates").arg("--nocolor")) {
+    if let Ok(out) = capture(cmd("checkupdates", &["--nocolor"])) {
         return Ok(parse_arrow_lines(&out, Source::Pacman));
     }
-    let out = capture(&mut Command::new("pacman").args(["-Qu"]))?;
+    let out = capture(cmd("pacman", &["-Qu"]))?;
     Ok(parse_arrow_lines(&out, Source::Pacman))
 }
 
 pub fn check_aur() -> CheckResult {
-    let out = capture(&mut Command::new("yay").args(["-Qua"]))?;
+    let out = capture(cmd("yay", &["-Qua"]))?;
     Ok(parse_arrow_lines(&out, Source::Aur))
 }
 
+/// Sahipli `Command` kurucusu (builder zinciri `&mut Command` döndürür).
+fn cmd(program: &str, args: &[&str]) -> Command {
+    let mut c = Command::new(program);
+    c.args(args);
+    c
+}
+
+/// Kurulu flatpak sürümleri: `flatpak list --columns=app,version`.
+/// Runtime satırlarında app sütunu çıplak addır (mimari/branch taşımaz).
+fn flatpak_installed() -> BTreeMap<String, String> {
+    let mut m = BTreeMap::new();
+    if let Ok(out) = capture(cmd("flatpak", &["list", "--columns=app,version"])) {
+        for line in out.lines() {
+            let cols: Vec<&str> = line.split('\t').map(str::trim).collect();
+            let (Some(app), Some(ver)) = (cols.first(), cols.get(1)) else {
+                continue;
+            };
+            if !app.is_empty() {
+                m.entry(app.to_string()).or_insert_with(|| ver.to_string());
+            }
+        }
+    }
+    m
+}
+
 pub fn check_flatpak() -> CheckResult {
-    let out = capture(&mut Command::new("flatpak").args([
-        "remote-ls",
-        "--updates",
-        "--columns=app,name,version",
-    ]))?;
-    Ok(parse_flatpak_lines(&out))
+    let installed = flatpak_installed();
+    let out = capture(cmd(
+        "flatpak",
+        &["remote-ls", "--updates", "--columns=app,name,version"],
+    ))?;
+    Ok(parse_flatpak_lines(&out, &installed))
+}
+
+/// Sıralama ölçütü: kaynak → düz uygulamalar önce, runtime/uzantılar sonra → ad.
+pub fn sort_updates(v: &mut [Update]) {
+    v.sort_by(|a, b| {
+        a.source
+            .order()
+            .cmp(&b.source.order())
+            .then(a.runtime.cmp(&b.runtime))
+            .then(a.name.cmp(&b.name))
+    });
 }
 
 #[cfg(test)]
@@ -174,14 +218,39 @@ mod tests {
 
     #[test]
     fn flatpak_lines() {
+        let installed = BTreeMap::from([
+            ("com.microsoft.Edge".into(), "156.0.4314.50-1".into()),
+            ("org.gnome.Platform".into(), "51.6".into()),
+        ]);
         let v = parse_flatpak_lines(
             "com.microsoft.Edge\tMicrosoft Edge\t156.0.4314.52-1\n\
-             org.gnome.Platform/x86_64/51\tGNOME Application Platform version 52\t\n",
+             org.gnome.Platform/x86_64/51\tGNOME Application Platform version 52\t52.4\n",
+            &installed,
         );
         assert_eq!(v.len(), 2);
         assert_eq!(v[0].name, "com.microsoft.Edge");
         assert_eq!(v[0].display, "Microsoft Edge");
-        assert_eq!(v[0].to, "156.0.4314.52-1");
-        assert_eq!(v[1].name, "org.gnome.Platform/x86_64/51"); // runtime ref'i
+        assert_eq!(v[0].from, "156.0.4314.50-1");
+        assert!(!v[0].runtime);
+        assert_eq!(v[1].name, "org.gnome.Platform/x86_64/51");
+        assert_eq!(v[1].to, "52.4");
+        assert!(v[1].runtime);
+        // kurulu eşleşmesi ref'in ilk bölümüyle: branch (x86_64/51) değil
+        assert_eq!(v[1].from, "51.6");
+    }
+
+    #[test]
+    fn runtime_sirada_sonra() {
+        let installed = BTreeMap::new();
+        let mut v = parse_flatpak_lines(
+            "org.gnome.Platform/x86_64/51\tPlatform\t52.4\n\
+             com.microsoft.Edge\tEdge\t1.2\n\
+             org.freedesktop.Platform.GL.default\tGL\t26.3\n",
+            &installed,
+        );
+        sort_updates(&mut v);
+        assert_eq!(v[0].name, "com.microsoft.Edge"); // düz uygulama en önce
+        assert_eq!(v[1].name, "org.freedesktop.Platform.GL.default");
+        assert_eq!(v[2].name, "org.gnome.Platform/x86_64/51");
     }
 }
