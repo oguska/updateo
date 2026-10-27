@@ -1,0 +1,5 @@
+#!/bin/sh
+case "${1:-}" in
+  -Qua) grep '^up aur' "${UPDATEO_FAKE_DB:?}" | sed 's/^up aur\t//' ;;
+  *) echo "FAKE-SUDO: yay $*" >> "${FAKE_SUDO_LOG:?}" ;;
+esac

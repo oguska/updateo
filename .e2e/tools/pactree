@@ -1,0 +1,12 @@
+#!/bin/sh
+# pactree -r --depth=1 <pkg>
+db="${UPDATEO_FAKE_DB:?}"
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -*) shift ;;
+        *) pkg="$1"; shift ;;
+    esac
+done
+[ -n "$pkg" ] || exit 2
+echo "$pkg"
+awk -F'\t' -v p="$pkg" '$1=="rdep" && $2==p {print "  "$3}' "$db"

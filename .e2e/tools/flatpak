@@ -1,0 +1,13 @@
+#!/bin/sh
+# Sahte flatpak: sorgular UPDATEO_FAKE_DB'den, uninstall yalnızca loglar.
+db="${UPDATEO_FAKE_DB:?}"
+case "${1:-}" in
+  list)
+    case "${2:-}" in
+      --columns=ref,version) grep '^fpref'  "$db" | sed 's/^fpref\t//' ;;
+      --columns=app,runtime) grep '^fprun'  "$db" | sed 's/^fprun\t//' ;;
+      --columns=app,version) grep '^fpinst' "$db" | sed 's/^fpinst\t//' ;;
+    esac ;;
+  remote-ls) grep '^up flatpak' "$db" | sed 's/^up flatpak\t//' ;;
+  uninstall) shift; echo "FAKE-SUDO: flatpak uninstall $*" >> "${FAKE_SUDO_LOG:?}" ;;
+esac

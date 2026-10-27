@@ -1,0 +1,16 @@
+inst	sed	4.10-2.1
+inst	nano	7.2-1
+inst	base	3-3
+up pacman	sed	4.10-2.1 -> 4.11-1
+up pacman	nano	7.2-1 -> 8.0-1
+up aur	tribler	2.2.2-1 -> 2.3.0-1
+rdep	sed	grep
+rdep	sed	diffutils
+rdep	nano	flex
+fpinst	org.freedesktop.Platform	25.08.19
+fpinst	com.microsoft.Edge	156.0.4314.52-1
+fpref	org.freedesktop.Platform/x86_64/25.08	25.08.19
+fpref	com.microsoft.Edge/x86_64/stable	156.0.4314.52-1
+fprun	com.microsoft.Edge	org.freedesktop.Platform/x86_64/25.08
+fprun	org.freedesktop.Platform/x86_64/25.08	org.freedesktop.Platform/x86_64/25.08
+up flatpak	org.freedesktop.Platform/x86_64/25.08	Freedesktop Platform	26.3

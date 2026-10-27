@@ -1,0 +1,2 @@
+#!/bin/sh
+grep '^up pacman' "${UPDATEO_FAKE_DB:?}" | sed 's/^up pacman\t//'

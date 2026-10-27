@@ -1,0 +1,12 @@
+#!/bin/sh
+# Sahte pacman: sisteme dokunmaz; veriler UPDATEO_FAKE_DB'den gelir.
+db="${UPDATEO_FAKE_DB:?}"
+case "${1:-}" in
+  -Qu) grep '^up pacman' "$db" | sed 's/^up pacman\t//' ;;
+  -Q)
+    [ -n "${2:-}" ] || exit 1
+    line=$(awk -F'\t' -v p="$2" '$1=="inst" && $2==p {print $2"\t"$3; exit}' "$db" | tr '\t' ' ')
+    [ -n "$line" ] || exit 1
+    echo "$line" ;;
+  *) exit 0 ;;
+esac

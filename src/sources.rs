@@ -456,6 +456,19 @@ mod tests {
     use super::*;
 
     #[test]
+    fn adlar_secenek_ile_baslayamaz() {
+        // tekrar eden ad tek kalır, boşlık ayracı yok
+        assert_eq!(split_names(" nano   sed nano ").unwrap(), ["nano", "sed"]);
+        // seçenek gibi görünen ad reddedilir: komut enjeksiyonu olmaz
+        let err = split_names("-Rns nope").unwrap_err();
+        assert!(err.contains("'-Rns'"), "gerekçede ad geçmeli: {err}");
+        assert!(split_names("--noconfirm").is_err());
+        assert!(split_names("nano -Rns").is_err());
+        // bos girdi ayri bir gerekce
+        assert!(split_names("   ").is_err());
+    }
+
+    #[test]
     fn kurma_komutlari() {
         let hello = ["hello".to_string()];
         let c = install_command(Source::Aur, &hello);

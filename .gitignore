@@ -1,1 +1,9 @@
 /target
+
+# uçtan uca korniş (fake pty) ürettikleri: sabit kalıplar değil
+.e2e/logs/
+.e2e/sudo.log
+.e2e/raw.bin
+.e2e/__pycache__/
+.e2e/xdg*/
+.e2e/tools/very/

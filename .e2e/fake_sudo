@@ -1,0 +1,4 @@
+#!/bin/sh
+# Güvenli uçtan uca kaldırma sınaması: gerçek pacman'e dokunmaz, komutu kaydeder.
+echo "FAKE-SUDO: $*" >> "${FAKE_SUDO_LOG:?}"
+exit 0

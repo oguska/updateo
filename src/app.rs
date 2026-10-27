@@ -120,6 +120,9 @@ pub struct App {
     /// Alt bardaki aktif giriş (`i` kurma / `x` kaldırma); None = gezinme modu.
     pkg_input: Option<Input>,
     input_mode: InputMode,
+    /// Giriş satırında gösterilecek reddetme gerekçesi (ör. `-` ile başlayan
+    /// ad). Girilen her tuşla, giriş kapanınca ve kabul edilince temizlenir.
+    input_error: Option<String>,
     /// Açık kaldırma onayı; None = onay penceresi yok.
     removal: Option<RemovalSession>,
     pub quit: bool,
@@ -142,6 +145,7 @@ impl App {
             status_err: false,
             pkg_input: None,
             input_mode: InputMode::Install,
+            input_error: None,
             removal: None,
             quit: false,
             rx,
@@ -639,23 +643,22 @@ impl App {
                     let names = match sources::split_names(&raw) {
                         Ok(v) => v,
                         Err(e) => {
-                            self.status = tr(
-                                &format!("Cannot parse name(s): {e}"),
-                                &format!("Ad/lar çözülemedi: {e}"),
-                            );
-                            self.status_err = true;
+                            // Girdi satırı açıkken durum satırı da o satırdır:
+                            // gerekçeyi orada, yazılan adın yanında göster.
+                            self.input_error = Some(e);
                             self.pkg_input = Some(inp);
                             return Ok(());
                         }
                     };
                     if raw.is_empty() {
-                        self.status = tr(
-                            "Empty name — press Esc to cancel.",
-                            "İsim boş — Esc ile vazgeç.",
-                        );
+                        self.input_error = Some(tr(
+                            "empty name — press Esc to cancel",
+                            "isim boş — Esc ile vazgeç",
+                        ));
                         self.status_err = false;
                         self.pkg_input = Some(inp);
                     } else {
+                        self.input_error = None;
                         match mode {
                             InputMode::Install => self.install(names),
                             InputMode::Remove => {
@@ -671,9 +674,12 @@ impl App {
                         InputMode::Remove => tr("Removal cancelled.", "Kaldırma iptal edildi."),
                     };
                     self.status_err = false;
+                    self.input_error = None;
                 }
                 _ => {
                     inp.handle_event(&Event::Key(k));
+                    // Yeni bir tuş: önceki reddetme gerekçesi geçersizleşir.
+                    self.input_error = None;
                     self.pkg_input = Some(inp);
                 }
             }
@@ -942,48 +948,67 @@ impl App {
         if let Some(inp) = &self.pkg_input {
             let src = Source::ALL[self.tab];
             let removing = self.input_mode == InputMode::Remove;
-            let prefix = format!(
-                " {} ",
-                if removing {
-                    sources::remove_preview(src)
-                } else {
-                    sources::install_preview(src)
-                }
-            );
-            let (hint, label, label_color) = if removing {
-                (
-                    tr("Enter review · Esc cancel", "Enter incele · Esc vazgeç"),
-                    tr(" remove ", " kaldırma "),
-                    Color::Red,
-                )
-            } else {
-                (
-                    tr("Enter install · Esc cancel", "Enter kur · Esc vazgeç"),
-                    tr(" install ", " kurma "),
-                    Color::Cyan,
-                )
-            };
-            let avail = (status_area.width as usize)
-                .saturating_sub(
-                    prefix.chars().count() + hint.chars().count() + label.chars().count() + 4,
-                )
-                .max(1);
             let chars: Vec<char> = inp.value().chars().collect();
-            let start = inp.visual_scroll(avail);
             let cur = inp.cursor();
-            let mut spans = vec![
-                Span::styled(
-                    label,
-                    Style::new()
-                        .fg(Color::Black)
-                        .bg(label_color)
-                        .add_modifier(Modifier::BOLD),
-                ),
-                Span::styled(
-                    prefix,
-                    Style::new().fg(label_color).add_modifier(Modifier::BOLD),
-                ),
-            ];
+            let label = if removing {
+                tr(" remove ", " kaldırma ")
+            } else {
+                tr(" install ", " kurma ")
+            };
+            let label_color = if removing { Color::Red } else { Color::Cyan };
+            let mut spans = vec![Span::styled(
+                label.clone(),
+                Style::new()
+                    .fg(Color::Black)
+                    .bg(label_color)
+                    .add_modifier(Modifier::BOLD),
+            )];
+            // Reddedilen bir ad varsa gerekçe yazılanın hemen yanında durur:
+            // durum satırı girdi açıkken yok, bu yüzden mesaj burada gösterilir.
+            if let Some(err) = &self.input_error {
+                let (avail, why) = input_error_layout(status_area.width, &label, err);
+                let start = inp.visual_scroll(avail);
+                spans.push(Span::raw(" "));
+                let mut used = 0usize;
+                for (i, c) in chars.iter().enumerate().skip(start).take(avail) {
+                    let st = if i == cur {
+                        Style::new().bg(Color::White).fg(Color::Black)
+                    } else {
+                        Style::new().fg(Color::White)
+                    };
+                    spans.push(Span::styled(c.to_string(), st));
+                    used += 1;
+                }
+                if avail > used {
+                    spans.push(Span::raw(" ".repeat(avail - used)));
+                }
+                spans.push(Span::styled(
+                    format!("  {why}"),
+                    Style::new().fg(Color::Red).add_modifier(Modifier::BOLD),
+                ));
+                f.render_widget(Paragraph::new(Line::from(spans)), status_area);
+                return;
+            }
+            let preview = if removing {
+                sources::remove_preview(src)
+            } else {
+                sources::install_preview(src)
+            };
+            let hint = if removing {
+                tr("Enter review · Esc cancel", "Enter incele · Esc vazgeç")
+            } else {
+                tr("Enter install · Esc cancel", "Enter kur · Esc vazgeç")
+            };
+            // Hane paylaşımı: yazılan paket adı öncelikli. Uzun bir sarmalayıcı
+            // (ör. tam yol `UPDATEO_SUDO`) ya da dar uçbirim girişi ezmesin.
+            let (preview, avail, hint) = input_layout(status_area.width, &label, &preview, &hint);
+            let prefix = format!(" {preview} ");
+            let start = inp.visual_scroll(avail);
+            let mut used = 0usize;
+            spans.push(Span::styled(
+                prefix,
+                Style::new().fg(label_color).add_modifier(Modifier::BOLD),
+            ));
             for (i, c) in chars.iter().enumerate().skip(start).take(avail) {
                 let st = if i == cur {
                     Style::new().bg(Color::White).fg(Color::Black)
@@ -991,12 +1016,19 @@ impl App {
                     Style::new().fg(Color::White)
                 };
                 spans.push(Span::styled(c.to_string(), st));
+                used += 1;
             }
             if cur >= start && cur < start + avail && cur >= chars.len() {
                 spans.push(Span::styled(
                     " ",
                     Style::new().bg(Color::White).fg(Color::Black),
                 ));
+                used += 1;
+            }
+            // Girdi hanesi tam `avail` haneye doldurulur: yazarken sağdaki
+            // ipucu sola kaymasın, aynı hizada dursun.
+            if avail > used {
+                spans.push(Span::raw(" ".repeat(avail - used)));
             }
             spans.push(Span::styled(
                 format!("   {hint}"),
@@ -1138,15 +1170,10 @@ impl App {
 
         let footer = {
             let targets = sess.targets();
-            let command = if targets.is_empty() {
-                tr("(no target selected)", "(seçili hedef yok)").to_string()
-            } else {
-                format!("{} {}", sources::remove_preview(src), targets.join(" "))
-            };
             // Komut satırı pencereye sığmalı; uzun listelerde sonu kısaltılır.
             let label = format!("{} ", tr("command:", "komut:"));
             let room = body_w.saturating_sub(label.chars().count() + 1);
-            let command = truncate(&command, room);
+            let command = command_preview(&sources::remove_preview(src), &targets, room);
             Line::from(vec![
                 Span::styled(label, Style::new().fg(Color::DarkGray)),
                 Span::styled(
@@ -1195,12 +1222,139 @@ impl App {
     }
 }
 
+/// Karakter sayısıyla kısalt: Türkçe metinde bayt sayısı hanesi şişirir.
 fn truncate(s: &str, w: usize) -> String {
     // karakter sayısıyla kısalt: Türkçe metinde bayt sayısı hanesi şişirir
     match s.char_indices().nth(w) {
         Some((i, _)) => format!("{}…", &s[..i]),
         None => s.to_string(),
     }
+}
+
+/// Kuyruğu korunarak kısaltma: komut önizlemesinde kritik kısım (bayraklar ve
+/// paket adları) sonda durur; sarmalayıcının tam yolu feda edilebilir.
+fn truncate_tail(s: &str, w: usize) -> String {
+    let n = s.chars().count();
+    if n <= w {
+        return s.to_string();
+    }
+    match w {
+        0 => String::new(),
+        1 => "…".into(),
+        keep => {
+            let at = s
+                .char_indices()
+                .nth(n - (keep - 1))
+                .map(|(i, _)| i)
+                .unwrap_or(s.len());
+            format!("…{}", &s[at..])
+        }
+    }
+}
+
+/// Önizlemedeki yetki sarmalayıcısı tam bir yolysa dizin kısmı düşürülür:
+/// `…/fake_sudo pacman -Rns` gibi kalır; bayraklar ve hedefler korunur.
+fn compact_wrapper(preview: &str) -> String {
+    let mut words = preview.splitn(2, ' ');
+    let head = words.next().unwrap_or_default();
+    let rest = words.next().unwrap_or_default();
+    let head = match head.rsplit('/').next() {
+        Some(base) if head.contains('/') && !base.is_empty() => format!("…/{base}"),
+        _ => head.to_string(),
+    };
+    if rest.is_empty() {
+        head
+    } else {
+        format!("{head} {rest}")
+    }
+}
+
+/// Komut önizlemesini `room` hanesine sığdır. Önce ekseni dene; sığmazsa
+/// sarmalayıcının dizin yolunu düşür, sonra hedefleri kuyruğundan kısalt
+/// (`… +N`). Böylece çalışacak komutun kendisi — sarmalayıcı ve bayraklar —
+/// sonuna kadar okunur; en kötü durumda iki uçtan kısaltmaya düşülür.
+fn command_preview(preview: &str, targets: &[String], room: usize) -> String {
+    if targets.is_empty() {
+        return truncate(&tr("(no target selected)", "(seçili hedef yok)"), room);
+    }
+    let full = format!("{} {}", preview, targets.join(" "));
+    if full.chars().count() <= room {
+        return full;
+    }
+    let preview = compact_wrapper(preview);
+    let mut n = targets.len();
+    loop {
+        let chosen = targets[..n].join(" ");
+        let dropped = targets.len() - n;
+        let line = match (dropped, n) {
+            (0, _) => format!("{preview} {chosen}"),
+            (m, 0) => format!("{preview} … +{m}"),
+            (m, _) => format!("{preview} {chosen} … +{m}"),
+        };
+        if line.chars().count() <= room {
+            return line;
+        }
+        match n.checked_sub(1) {
+            Some(next) => n = next,
+            None => break,
+        }
+    }
+    // Hedef listesi bile sığmıyor: hiç olmazsa çalışacak komut görünsün.
+    truncate_tail(&preview, room)
+}
+
+/// Giriş satırının hane paylaşımı: `(önizleme, girdi hanesi, ipucu)`.
+/// Öncelik: sabit etiket → yazılan ad (`MIN_INPUT` hane) → ipucu → önizleme.
+/// Yer daralınca önce önizleme kuyruğundan kısalır, sonra ipucu kısalmış
+/// biçimine düşer; uzun bir `UPDATEO_SUDO` yolu girişi ezemez.
+fn input_layout(width: u16, label: &str, preview: &str, hint: &str) -> (String, usize, String) {
+    const MIN_INPUT: usize = 12;
+    const SHORT_HINT: &str = "Enter/Esc";
+    // etiket + " önizleme " + girdi ile ipucu arasındaki ayraç boşlukları
+    let fixed = label.chars().count() + 5;
+    let room = (width as usize).saturating_sub(fixed);
+    let full = preview.chars().count() + hint.chars().count();
+    if room >= full + MIN_INPUT {
+        return (preview.to_string(), room - full, hint.to_string());
+    }
+    let hint_txt = if room >= MIN_INPUT + SHORT_HINT.chars().count() + 2 {
+        SHORT_HINT.to_string()
+    } else {
+        String::new()
+    };
+    let avail = room
+        .saturating_sub(hint_txt.chars().count() + 2)
+        .min(MIN_INPUT)
+        .max(1.min(room));
+    let preview_w = room.saturating_sub(avail + hint_txt.chars().count() + 2);
+    // Onay penceresiyle aynı mantık: önce sarmalayıcının dizin yolu düşer,
+    // sonra kuyruktan kısalır — kalan parça her hâlde çalışacak komuttur.
+    let compact = compact_wrapper(preview);
+    let shown = if compact.chars().count() <= preview_w {
+        compact
+    } else {
+        truncate_tail(&compact, preview_w)
+    };
+    (shown, avail, hint_txt)
+}
+
+/// Reddetme gerekçeli giriş satırının hane paylaşımı: `(girdi hanesi, gerekçe)`.
+/// Öncelik yazılan ad (`MIN_INPUT` hane); gerekçe kalan yere sığmazsa
+/// kuyruğundan kısalır, ama gerekçenin kendisi de en az 8 hane alır.
+fn input_error_layout(width: u16, label: &str, err: &str) -> (usize, String) {
+    const MIN_INPUT: usize = 12;
+    const MIN_WHY: usize = 8;
+    let fixed = label.chars().count() + 3; // etiket + ayraç boşlukları
+    let room = (width as usize).saturating_sub(fixed);
+    let why_full = err.chars().count();
+    if room >= MIN_INPUT + why_full + 2 {
+        return (room.saturating_sub(why_full + 2), err.to_string());
+    }
+    let why_w = room.saturating_sub(MIN_INPUT + 2).max(MIN_WHY.min(room));
+    (
+        room.saturating_sub(why_w + 2),
+        truncate(err, why_w.max(1.min(room))),
+    )
 }
 
 #[cfg(test)]
@@ -1268,6 +1422,142 @@ mod tests {
         assert_eq!(truncate("pacman 6.1.0", 8), "pacman 6…");
         // çok baytlı karakter tek gösterim hanesi sayılır
         assert_eq!(truncate("güncellendi", 6), "güncel…");
+    }
+
+    #[test]
+    fn kuyruk_kisaltmasi_bayragi_korur() {
+        assert_eq!(truncate_tail("linux", 8), "linux");
+        assert_eq!(truncate_tail("sudo pacman -Rns", 8), "…an -Rns");
+        assert_eq!(truncate_tail("sudo pacman -Rns", 1), "…");
+        assert_eq!(truncate_tail("sudo pacman -Rns", 0), "");
+        // çok baytlı karakterler haneyi şişirmez
+        assert_eq!(truncate_tail("güncellendi", 6).chars().count(), 6);
+    }
+    #[test]
+    fn girdi_hanesi_onizlemeyi_ezmez() {
+        let label = tr(" remove ", " kaldırma ");
+        let hint = tr("Enter review · Esc cancel", "Enter incele · Esc vazgeç");
+        let long = "/long/path/to/updateo/bin/fake-root-wrapper pacman -Rns";
+        // geniş uçbirim: her şey eksik, girdi kalan yeri alır
+        let (preview, avail, hint_txt) = input_layout(84, &label, "sudo pacman -Rns", &hint);
+        assert_eq!(preview, "sudo pacman -Rns");
+        assert_eq!(hint_txt, hint);
+        assert!(avail >= 20, "geniş hane: {avail}");
+        // uzun sarmalayıcı yolu (ör. tam yollu UPDATEO_SUDO) girişi ezmez:
+        // önizleme kuyruğundan kısalır, girdi hanesi tavan yapar
+        let (preview, avail, hint_txt) = input_layout(84, &label, long, &hint);
+        assert!(
+            preview.ends_with("pacman -Rns") && preview.chars().count() < long.chars().count(),
+            "kuyruk korunmalı: {preview}"
+        );
+        assert_eq!(avail, 12, "girdi hanesi korunmalı: {avail}");
+        assert_eq!(hint_txt, "Enter/Esc");
+        // orta/dar uçbirim: satır taşmaz, girdi hanesi hiç yok olmaz
+        for width in [34u16, 48, 60, 84] {
+            let (preview, avail, hint_txt) = input_layout(width, &label, long, &hint);
+            let used = label.chars().count()
+                + preview.chars().count()
+                + avail
+                + hint_txt.chars().count()
+                + 5;
+            assert!(used <= width as usize, "{width} hanede taşma: {used}");
+            assert!(avail >= 1, "{width} hanede girdi görünmeli");
+        }
+        // etiketin kendisinin sığmadığı uçbirim: panik yok, çökme yok
+        for width in [4u16, 10, 18] {
+            let (_, _, _) = input_layout(width, &label, long, &hint);
+        }
+    }
+
+    #[test]
+    fn reddedilen_ad_gerekcesi_girdiyi_ezmez() {
+        let label = tr(" remove ", " kaldırma ");
+        let err = "invalid name '-Rns': package names may not start with '-'";
+        // geniş uçbirim: gerekçe eksik, girdi hanesi kalan yeri alır
+        let (avail, why) = input_error_layout(100, &label, err);
+        assert_eq!(why, err);
+        assert!(avail >= 12, "girdi hanesi: {avail}");
+        // dar uçbirim: satır taşmaz, iki parça da görünür kalır
+        for width in [24u16, 34, 48, 60, 84] {
+            let (avail, why) = input_error_layout(width, &label, err);
+            let used = label.chars().count() + avail + why.chars().count() + 3;
+            assert!(used <= width as usize, "{width} hanede taşma: {used}");
+            assert!(avail >= 1, "{width} hanede yazılan ad görünmeli");
+            assert!(why.chars().count() >= 8, "{width} hanede gerekçe: {why}");
+        }
+        // etiketin sığmadığı uçbirim: panik yok
+        for width in [2u16, 6, 12] {
+            input_error_layout(width, &label, err);
+        }
+    }
+
+    #[test]
+    fn komut_onizlemesi_pencereye_sigar() {
+        let long = "/long/path/to/updateo/bin/fake-root-wrapper pacman -Rns";
+        let targets: Vec<String> = (0..12).map(|i| format!("paket{i}")).collect();
+        // geniş yer: ekseni komut, kısaltma yok
+        let wide = command_preview(long, &targets, 200);
+        assert_eq!(wide, format!("{long} {}", targets.join(" ")));
+        // dar yer: sarmalayıcının yolu düşer, bayraklar ve hedefler kalır
+        let tight = command_preview(long, &targets, 60);
+        assert!(tight.chars().count() <= 60, "taşma: {tight}");
+        assert!(
+            tight.contains("fake-root-wrapper pacman -Rns"),
+            "komut okunmalı: {tight}"
+        );
+        assert!(tight.contains('…'), "kısaltma işareti: {tight}");
+        // aşırı dar: yine de sığar, panik yok; son kalan parça komutun kendisi
+        for room in [0usize, 1, 8, 17, 24, 40] {
+            let line = command_preview(long, &targets, room);
+            assert!(line.chars().count() <= room, "{room} haneye sığmadı: {line}");
+        }
+        assert!(
+            command_preview(long, &targets, 17).contains("-Rns"),
+            "bayraklar korunmalı"
+        );
+        // seçili hedef yoksa boşluk değil, açıklama görünür
+        let none = command_preview(long, &[], 40);
+        assert!(
+            none.contains("target") || none.contains("hedef"),
+            "açıklama görünmeli: {none}"
+        );
+    }
+
+    /// Alt giriş satırı: yazılan paket adı uzun önizlemeden önce gelir ve
+    /// çizim satıra sığar (karakter kaybı görünen hata değil, yerleşim).
+    fn input_row(width: u16, value: &str, cursor: usize) -> String {
+        use ratatui::Terminal;
+        use ratatui::backend::TestBackend;
+
+        let mut app = App::new();
+        app.input_mode = InputMode::Remove;
+        app.pkg_input = Some(Input::new(value.into()).with_cursor(cursor));
+        let mut term = Terminal::new(TestBackend::new(width, 12)).unwrap();
+        let drawn = term.draw(|f| app.draw(f)).unwrap();
+        let buf = drawn.buffer;
+        let y = buf.area.height - 1;
+        (0..buf.area.width)
+            .map(|x| buf[(x, y)].symbol())
+            .collect::<String>()
+            .trim_end()
+            .to_string()
+    }
+
+    #[test]
+    fn girdi_satiri_yazilan_adi_gosterir() {
+        // dar uçbirimde bile yazılan ad tam görünür; uzun önizleme kısalır
+        let row = input_row(48, "nano sed", 8);
+        assert!(row.contains("nano sed"), "yazılan ad kaybolmuş: {row:?}");
+        assert!(row.contains("kaldırma") || row.contains("remove"), "etiket: {row:?}");
+        assert!(row.chars().count() <= 48, "satır taşmış: {row:?}");
+        // uzun girdi kaydırılır: imleçteki son kısım görünür
+        let long = input_row(48, "nano sed grep diffutils", 23);
+        assert!(long.contains("diffutils"), "imleç görünmeli: {long:?}");
+        assert!(long.chars().count() <= 48, "satır taşmış: {long:?}");
+        // aşırı dar uçbirim: panik yok, etiket yine satırın başında
+        let tiny = input_row(18, "nano", 4);
+        assert!(tiny.chars().count() <= 18, "satır taşmış: {tiny:?}");
+        assert!(tiny.starts_with(' ') || tiny.contains("nano"), "girdi: {tiny:?}");
     }
 
     /// Onay penceresi küçük uçbirimde de çöker mi: kaydırma, sığdırma, panik yok.
@@ -1347,7 +1637,7 @@ mod tests {
         let rows = render_at(30, 7, 11, tiny_plan);
         let body = body(&rows);
         assert!(
-            body.last().unwrap().contains("pacman"),
+            body.last().unwrap().contains("pacman -Rns"),
             "komut görünmeli: {body:?}"
         );
         for row in &rows {
