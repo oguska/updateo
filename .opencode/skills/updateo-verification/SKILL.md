@@ -34,6 +34,12 @@ sh .e2e/probes.sh
 - Do not run the probes against the live system. `screen_dump.py` overrides
   `PATH`, `UPDATEO_SUDO`, `UPDATEO_FAKE_DB`, `FAKE_SUDO_LOG`, and
   `XDG_DATA_HOME`; the fake sudo only appends to `.e2e/sudo.log`.
+- `configure` probes use a temporary `XDG_CONFIG_HOME`; never write the real
+  `~/.config/updateo/config.json` in tests.
+- `sh -n bootstrap.sh` validates shell syntax. A manual smoke test can set
+  `XDG_CONFIG_HOME`, `UPDATEO_BINDIR`, `UPDATEO_ASSUME_YES`, and the
+  `UPDATEO_NOTIFY`/`UPDATEO_UNATTENDED`/`UPDATEO_CHECK_TIME`/
+  `UPDATEO_AUTOSTART` variables, with a fake `systemctl` first in `PATH`.
 
 ## Formatting
 
@@ -75,6 +81,13 @@ rustfmt --edition 2024 src/<file>.rs   # only when the diff is yours
     and the selected action launches the TUI in a fake terminal. This probe
     uses `.e2e/tools/notify-send` and `.e2e/fake_terminal` logs rather than a
     PTY screen dump.
+17. `updateo --version` matches the version in `Cargo.toml`.
+18. `updateo configure` writes a normalized config (time `7:05` -> `07:05`)
+    under a temporary `XDG_CONFIG_HOME`.
+
+The bootstrap script is not a probe: it builds and installs the binary, so run
+it manually with a temporary `UPDATEO_BINDIR` and `XDG_CONFIG_HOME` plus a fake
+`systemctl` in `PATH` (and `UPDATEO_ASSUME_YES=1`).
 
 The harness is `.e2e/screen_dump.py`:
 

@@ -1335,7 +1335,10 @@ impl App {
                 (list_area, None)
             };
         let title = if self.filter.is_empty() || self.is_hist_tab() {
-            tr(" updateo · Arch updater ", " updateo · Arch güncelleyici ")
+            tr(
+                &format!(" updateo v{} · Arch updater ", crate::VERSION),
+                &format!(" updateo v{} · Arch güncelleyici ", crate::VERSION),
+            )
         } else {
             tr(
                 &format!(" updateo · filter: {} ", self.filter),

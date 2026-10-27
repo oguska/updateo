@@ -611,6 +611,24 @@ pub fn apply_preview(src: Source) -> String {
     }
 }
 
+/// Zamanlayıcı/otomasyon için onaysız güncelleme komutu. Pacman tüm sistemi
+/// `-Syu --noconfirm` ile günceller; AUR ve Flatpak yalnız bilinen adları alır.
+pub fn unattended_update_command(src: Source, names: &[String]) -> Command {
+    match src {
+        Source::Pacman => root_command("pacman", &["-Syu", "--noconfirm"]),
+        Source::Aur => {
+            let mut args = vec!["-S", "--noconfirm"];
+            args.extend(names.iter().map(String::as_str));
+            cmd("yay", &args)
+        }
+        Source::Flatpak => {
+            let mut args = vec!["update", "-y"];
+            args.extend(names.iter().map(String::as_str));
+            cmd("flatpak", &args)
+        }
+    }
+}
+
 /// Sıralama ölçütü: kaynak → düz uygulamalar önce, runtime/uzantılar sonra → ad.
 pub fn sort_updates(v: &mut [Update]) {
     v.sort_by(|a, b| {
@@ -687,6 +705,31 @@ mod tests {
         assert_eq!(
             c.get_args().collect::<Vec<_>>(),
             ["uninstall", "org.gnome.Maps"]
+        );
+    }
+
+    #[test]
+    fn onaysiz_guncelleme_komutlari() {
+        let names = ["tribler".to_string()];
+        let c = unattended_update_command(Source::Aur, &names);
+        assert_eq!(c.get_program(), "yay");
+        assert_eq!(
+            c.get_args().collect::<Vec<_>>(),
+            ["-S", "--noconfirm", "tribler"]
+        );
+
+        let c = unattended_update_command(Source::Flatpak, &names);
+        assert_eq!(c.get_program(), "flatpak");
+        assert_eq!(
+            c.get_args().collect::<Vec<_>>(),
+            ["update", "-y", "tribler"]
+        );
+
+        let c = unattended_update_command(Source::Pacman, &names);
+        let args: Vec<std::ffi::OsString> = c.get_args().map(|a| a.to_os_string()).collect();
+        assert_eq!(
+            args[args.len() - 3..],
+            ["pacman", "-Syu", "--noconfirm"].map(std::ffi::OsString::from)
         );
     }
 

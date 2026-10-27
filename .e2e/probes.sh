@@ -159,6 +159,30 @@ if ! grep -q "updateo" "$term_log"; then
     fail=$((fail + 1))
 fi
 
+# 17) sürüm tek kaynaktan gelir
+printf '%-46s ' "version is reported"
+version=$(target/release/updateo --version)
+expected=$(sed -n 's/^version = "\([^"]*\)"/\1/p' Cargo.toml | head -1)
+case "$version" in
+    "updateo $expected") echo OK ;;
+    *) echo "FAIL ($version)"; fail=$((fail + 1)) ;;
+esac
+
+# 18) configure: seçenekleri doğrular, saati normalize eder, config yazar
+cfg=.e2e/xdgC
+mkdir -p "$cfg"
+run "configure writes validated config" \
+    env XDG_CONFIG_HOME="$cfg" target/release/updateo configure \
+    --notify no --unattended yes --check-time 7:05 --autostart yes
+if ! grep -q '"notify": false' "$cfg/updateo/config.json" ||
+    ! grep -q '"unattended": true' "$cfg/updateo/config.json" ||
+    ! grep -q '"check_time": "07:05"' "$cfg/updateo/config.json" ||
+    ! grep -q '"autostart": true' "$cfg/updateo/config.json"; then
+    echo "    FAIL: yapılandırma beklenen değerleri içermiyor"
+    cat "$cfg/updateo/config.json"
+    fail=$((fail + 1))
+fi
+
 echo "----"
 if [ "$fail" -eq 0 ]; then
     echo "ALL PROBES OK"

@@ -1,52 +1,46 @@
 //! systemd-user zamanlayıcısı: `updateo install-timer` günlük `check --notify`
 //! birimi kurar; bildirim `notify-send` ile gider (yoksa günlüğe düşer).
-//! Bildirimdeki eylem TUI'yi masaüstü uçbiriminde açar.
+//! Bildirimdeki eylem TUI'yi masaüstü uçbiriminde açar. Saat ve onaysız
+//! güncelleme `config.json` içinden okunur.
 
+use crate::config::{self, Config};
 use crate::i18n::tr;
 use std::io;
 use std::path::PathBuf;
 use std::process::Command;
 
 fn unit_dir() -> io::Result<PathBuf> {
-    let base = match std::env::var_os("XDG_CONFIG_HOME") {
-        Some(v) if !v.is_empty() => PathBuf::from(v),
-        _ => match std::env::var_os("HOME") {
-            Some(h) if !h.is_empty() => PathBuf::from(h).join(".config"),
-            _ => {
-                return Err(io::Error::new(
-                    io::ErrorKind::NotFound,
-                    tr(
-                        "HOME/XDG_CONFIG_HOME is not set",
-                        "HOME/XDG_CONFIG_HOME tanımlı değil",
-                    ),
-                ));
-            }
-        },
-    };
-    Ok(base.join("systemd").join("user"))
+    Ok(config::dir()?.join("systemd").join("user"))
 }
 
-fn service_text(exe: &str) -> String {
+fn service_text(exe: &str, config: &Config) -> String {
+    let action = if config.unattended {
+        "update --yes --notify"
+    } else {
+        "check --notify"
+    };
     format!(
         "[Unit]\n\
          Description=updateo package update check\n\
          [Service]\n\
          Type=oneshot\n\
          KillMode=process\n\
-         ExecStart=\"{exe}\" check --notify\n"
+         ExecStart=\"{exe}\" {action}\n"
     )
 }
 
-fn timer_text() -> String {
-    "[Unit]\n\
-     Description=Daily updateo update check\n\
-     [Timer]\n\
-     OnCalendar=*-*-* 09:30:00\n\
-     Persistent=true\n\
-     RandomizedDelaySec=900\n\
-     [Install]\n\
-     WantedBy=timers.target\n"
-        .to_string()
+fn timer_text(config: &Config) -> String {
+    format!(
+        "[Unit]\n\
+         Description=Daily updateo update check\n\
+         [Timer]\n\
+         OnCalendar=*-*-* {time}:00\n\
+         Persistent=true\n\
+         RandomizedDelaySec=900\n\
+         [Install]\n\
+         WantedBy=timers.target\n",
+        time = config.check_time
+    )
 }
 
 /// systemctl --user çağrısı; hata olursa manuel adım önerilir (sıfır olmayan dönüş).
@@ -87,14 +81,15 @@ fn systemctl(args: &[&str]) -> io::Result<bool> {
 pub fn install() -> io::Result<()> {
     let dir = unit_dir()?;
     std::fs::create_dir_all(&dir)?;
+    let config = config::load();
     let exe = std::env::current_exe()?
         .canonicalize()
         .unwrap_or_else(|_| std::env::current_exe().unwrap_or_default());
     std::fs::write(
         dir.join("updateo.service"),
-        service_text(&exe.display().to_string()),
+        service_text(&exe.display().to_string(), &config),
     )?;
-    std::fs::write(dir.join("updateo.timer"), timer_text())?;
+    std::fs::write(dir.join("updateo.timer"), timer_text(&config))?;
     println!(
         "{}",
         tr(
@@ -107,8 +102,14 @@ pub fn install() -> io::Result<()> {
     println!(
         "{}",
         tr(
-            "timer installed: daily 09:30 (+up to 15 min jitter), Persistent=true; run 'updateo uninstall-timer' to remove",
-            "zamanlayıcı kuruldu: günlük 09:30 (+15 dk titrek), Persistent=true; kaldırmak için 'updateo uninstall-timer' çalıştırın"
+            &format!(
+                "timer installed: daily {} (+up to 15 min jitter), Persistent=true; run 'updateo uninstall-timer' to remove",
+                config.check_time
+            ),
+            &format!(
+                "zamanlayıcı kuruldu: günlük {} (+15 dk titrek), Persistent=true; kaldırmak için 'updateo uninstall-timer' çalıştırın",
+                config.check_time
+            )
         )
     );
     Ok(())
@@ -137,13 +138,23 @@ mod tests {
 
     #[test]
     fn unit_metinleri() {
-        let svc = service_text("/usr/bin/updateo");
+        let cfg = Config {
+            check_time: "07:15".into(),
+            unattended: false,
+            ..Config::default()
+        };
+        let svc = service_text("/usr/bin/updateo", &cfg);
         assert!(svc.contains("ExecStart=\"/usr/bin/updateo\" check --notify"));
         assert!(svc.contains("Type=oneshot"));
         // Bildirimden açılan uçbirim, oneshot servis bitince öldürülmemeli.
         assert!(svc.contains("KillMode=process"));
-        let t = timer_text();
-        assert!(t.contains("OnCalendar=*-*-* 09:30:00") && t.contains("Persistent=true"));
+        let unattended = Config {
+            unattended: true,
+            ..cfg.clone()
+        };
+        assert!(service_text("/usr/bin/updateo", &unattended).contains("update --yes --notify"));
+        let t = timer_text(&cfg);
+        assert!(t.contains("OnCalendar=*-*-* 07:15:00") && t.contains("Persistent=true"));
         assert!(t.contains("WantedBy=timers.target"));
     }
 }

@@ -1,5 +1,7 @@
 # updateo
 
+[English](README.en.md) · Türkçe
+
 Arch tabanlı sistemler (Arch, CachyOS, Manjaro…) için tek arayüzden güncelleme
 yöneticisi: **pacman (repo) + AUR (yay) + Flatpak** güncellemelerini tek TUI'de
 listeler, paket paket seçmene olanak tanır ve güncellemeleri doğrudan uygular.
@@ -32,9 +34,11 @@ listeler, paket paket seçmene olanak tanır ve güncellemeleri doğrudan uygula
   `flatpak install -y`) gerçek TTY'de çalıştırır — kurulum onayı (Y) sorulmaz,
   yalnız sudo parolası gerekebilir; sonuç geçmişe yazılır
 - Kontroller paralel thread'lerde; ağ hatası tek kaynağı düşürür, arayüzü kilitlemez
+- Eylemli masaüstü bildirimi: güncelleme varsa “Şimdi güncelle” düğmesi TUI'yi
+  masaüstü uçbiriminde açar; `notify-send` yoksa journal'a düşer
+- `~/.config/updateo/config.json` ile bildirim, onaysız güncelleme, günlük
+  kontrol saati ve açılış kontrolü kalıcı olarak ayarlanır
 - Tek statik binary, runtime bağımlılığı yok (SQLite gömülü)
-- Bildirim `check --notify` ile gelir: güncelleme varsa masaüstü bildirimi
-  açılır, **Şimdi güncelle** düğmesi updateo TUI'yi uçbirimde başlatır
 - Arayüz dili sistem dilinden seçilir: `LC_ALL` → `LC_MESSAGES` → `LANG`;
   `tr` öneki Türkçe, diğer her şey İngilizce
 
@@ -43,8 +47,14 @@ listeler, paket paket seçmene olanak tanır ve güncellemeleri doğrudan uygula
 ```
 updateo                        TUI
 updateo check [--notify]       TUI'siz kontrol; --notify eylemli masaüstü bildirimi
-updateo install-timer          systemd-user günlük zamanlayıcısı (09:30, Persistent)
+updateo update --yes [--notify]  tüm güncellemeleri onaysız uygula (otomasyon)
+updateo configure [--notify yes|no] [--unattended yes|no]
+                  [--check-time SS:DD] [--autostart yes|no]
+updateo install-timer          systemd-user günlük zamanlayıcısı (config saati)
 updateo uninstall-timer        zamanlayıcıyı kaldır
+updateo install-autostart      açılışta arka plan kontrolü kur
+updateo uninstall-autostart    açılış kontrolünü kaldır
+updateo --version              sürümü yazdır
 ```
 
 Zamanlayıcı kurulunca günlük `check --notify` çalışır; güncelleme varsa
@@ -96,6 +106,28 @@ cargo build --release
 
 Kurulum: `sudo install -Dm755 target/release/updateo /usr/local/bin/updateo`
 
+## Bootstrap
+
+`./bootstrap.sh` etkileşimli olarak dört soru sorar, release binary'yi derler,
+`/usr/local/bin/updateo` altına kurar, `config.json` yazar ve systemd
+zamanlayıcısını/açılış kontrolünü etkinleştirir:
+
+1. Masaüstü bildirimi gösterilsin mi?
+2. Güncellemeler onaysız uygulanmalı mı? (sudo NOPASSWD gerekir)
+3. Günlük kontrol saati (varsayılan `09:30`)
+4. Oturum açılışında arka plan kontrolü çalışsın mı?
+
+Etkileşimsiz kurulum için ortam değişkenleri kullanılabilir:
+
+```sh
+UPDATEO_ASSUME_YES=1 UPDATEO_NOTIFY=yes UPDATEO_UNATTENDED=no \
+UPDATEO_CHECK_TIME=09:30 UPDATEO_AUTOSTART=yes ./bootstrap.sh
+```
+
+Hedef dizin `UPDATEO_BINDIR` ile değiştirilebilir. Sürüm `Cargo.toml` içindeki
+`package.version` değerinden gelir; `updateo --version` ve TUI başlığı aynı
+değeri gösterir. Değişiklikler `CHANGELOG.md` içinde tutulur.
+
 ## Nasıl çalışıyor
 
 | Kaynak  | Kontrol                          | Uygulama                 | Arama / ayrıntı |
@@ -123,6 +155,12 @@ Notlar:
 - Bildirim eylemi 45 saniye görünür kalır; tıklanınca TUI açılır (sudo/pacman
   onayları yine gerçek uçbirimde sorulur). Masaüstü bildirim servisi eylemleri
   desteklemiyorsa bildirim yalnız bilgi olarak kalır.
+- `notify=false` iken `check --notify` sessiz kalır. `unattended=true` ise
+  zamanlayıcı `update --yes --notify` çalıştırır; TTY olmadığı için sudo'nun
+  parolasız olması (NOPASSWD veya polkit) gerekir. AUR derlemeleri de onaysız
+  akar; riskli olduğundan varsayılan kapalıdır.
+- `autostart=true` TUI'yi açmaz; oturum açılışında arka planda `check --notify`
+  çalıştırır. Ayar `~/.config/autostart/updateo.desktop` dosyasına yazılır.
 - Flatpak uygulamaları sistem kuruluma göre polkit/parola sorabilir.
 
 ## Yol haritası
@@ -146,6 +184,10 @@ Notlar:
 - [x] Görsel yenileme: tui-scrollbar ile akıcı kaydırma, kontrol sırasında
       animasyonlu spinner + eta, popup'lı onay akışı, big-text başlık
       (hepsi ratatui 0.30.2 ile uyumu test edildi)
+- [x] Etkileşimli bootstrap (`bootstrap.sh`), kalıcı `config.json`, yapılandırılabilir
+      kontrol saati, onaysız güncelleme ve açılış kontrolü
+- [x] Sürüm sistemi: `Cargo.toml` → `--version` / TUI başlığı, `CHANGELOG.md`
+- [x] İngilizce README (`README.en.md`)
 
 ## Lisans
 

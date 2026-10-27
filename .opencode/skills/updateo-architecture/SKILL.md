@@ -21,13 +21,15 @@ serde/serde_json, chrono.
 
 | Path | Responsibility |
 |------|----------------|
-| `src/main.rs` | CLI dispatch (`check [--notify]`, `install-timer`, `uninstall-timer`, default TUI), actionable notification + terminal launch, terminal setup, panic hook. |
+| `src/main.rs` | CLI dispatch (`check [--notify]`, `update --yes`, `configure`, timer/autostart, `--version`, default TUI), actionable notification + terminal launch, terminal setup, panic hook. |
 | `src/app.rs` | `App` state, tabs, async checks/search, key handling, all rendering, filter/search/details/apply/install/remove popups, layout/truncation helpers. |
+| `src/config.rs` | `Config` at `$XDG_CONFIG_HOME/updateo/config.json`: notify, unattended, check_time, autostart; validation/normalization and save. |
+| `src/autostart.rs` | XDG autostart `.desktop` (`check --notify` at login), install/uninstall. |
 | `src/sources.rs` | `Source`/`Update`/`SearchHit`, check/search/detail commands and parsers, command builders, `UPDATEO_SUDO`, name validation, removal plans, installed versions, previews. |
 | `src/history.rs` | SQLite history at `$XDG_DATA_HOME/updateo/history.db`; one-time `history.jsonl` import; `record`, `load`, `is_success`. |
 | `src/runner.rs` | `run_suspended`: leaves raw mode/alternate screen, runs a child on the real TTY, restores the TUI. |
 | `src/i18n.rs` | `tr(en, tr)`; language from `LC_ALL` → `LC_MESSAGES` → `LANG`; `tr` prefix means Turkish, everything else English. |
-| `src/timer.rs` | systemd-user service/timer text and `systemctl --user` install/uninstall. |
+| `src/timer.rs` | systemd-user service/timer text from config (daily time, `check` vs `update --yes`) and `systemctl --user` install/uninstall. |
 
 ## Data flow
 
@@ -58,6 +60,15 @@ serde/serde_json, chrono.
    (`xdg-terminal-exec`, `konsole`, `alacritty`, `kitty`, `foot`, `wezterm`,
    `gnome-terminal`, `xfce4-terminal`, `xterm`). `terminal_args` owns the
    per-terminal `-e`/`--`/`start --` differences.
+8. `cmd_update --yes` checks each source, applies via
+   `unattended_update_command`, records history, and optionally notifies. The
+   timer chooses `check --notify` or `update --yes --notify` from
+   `Config.unattended`; `cmd_check`/`cmd_update` gate notifications on
+   `Config.notify`.
+9. `Config` is loaded by `check`, `update`, `timer::install`, and autostart
+   setup. `configure` writes it with validation; `bootstrap.sh` prompts, builds,
+   installs, then calls `configure`, `install-timer`, and
+   `install-autostart`/`uninstall-autostart`.
 
 ## Command builders (keep them in `sources.rs`)
 
@@ -68,6 +79,9 @@ serde/serde_json, chrono.
   --columns=app,name,version` plus `flatpak list --columns=app,version`.
 - Apply/update: pacman `pacman -Syu <names>`, AUR `yay -S <names>`, Flatpak
   `flatpak update <names>`. These remain interactive by design.
+- Unattended (`update --yes` / timer): pacman `pacman -Syu --noconfirm`, AUR
+  `yay -S --noconfirm <names>`, Flatpak `flatpak update -y <names>`. It runs
+  with stdin null and needs passwordless sudo/polkit.
 - Install (`i`): pacman `pacman -S --noconfirm <names>`, AUR
   `yay -S --noconfirm <names>`, Flatpak `flatpak install -y <names>`.
   The user must not have to answer the `Y` install prompt; sudo/polkit may still
