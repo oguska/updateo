@@ -4,7 +4,7 @@ All notable changes to updateo are documented here. The project follows
 [Semantic Versioning](https://semver.org/): the version is defined once in
 `Cargo.toml` and exposed by `updateo --version`.
 
-## Unreleased
+## 0.2.2 — 2026-10-27
 
 - Search: Enter installs the selected result; Ctrl+D opens its details.
 
